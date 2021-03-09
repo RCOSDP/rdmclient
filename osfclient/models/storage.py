@@ -70,7 +70,7 @@ class Storage(OSFCore, ContainerMixin):
         return self._iter_children(self._files_url, 'file', File,
                                    self._files_key, target_filter)
 
-    def create_file(self, path, fp, force=False, update=False):
+    async def create_file(self, path, fp, force=False, update=False):
         """Store a new file at `path` in this storage.
 
         The contents of the file descriptor `fp` (opened in 'rb' mode)
@@ -93,7 +93,7 @@ class Storage(OSFCore, ContainerMixin):
         for directory in directories:
             # skip empty directory names
             if directory:
-                parent = parent.create_folder(directory, exist_ok=True)
+                parent = await parent.create_folder(directory, exist_ok=True)
 
         url = parent._new_file_url
 
@@ -106,10 +106,10 @@ class Storage(OSFCore, ContainerMixin):
         # turns out to be of length zero then no file is created on the OSF.
         # See: https://github.com/osfclient/osfclient/pull/135
         if file_empty(fp):
-            response = self._put(url, params={'name': fname}, data=b'')
+            response = await self._put(url, params={'name': fname}, data=b'')
         else:
             try:
-                response = self._put(url, params={'name': fname}, data=fp)
+                response = await self._put(url, params={'name': fname}, data=fp)
             except ConnectionError:
                 connection_error = True
 
@@ -132,7 +132,7 @@ class Storage(OSFCore, ContainerMixin):
 
             else:
                 # find the upload URL for the file we are trying to update
-                for file_ in self.files:
+                async for file_ in self.files:
                     if norm_remote_path(file_.path) == path:
                         if not force:
                             if checksum(path) == file_.hashes.get('md5'):
@@ -143,7 +143,7 @@ class Storage(OSFCore, ContainerMixin):
                         # moved through it -> reset read position to beginning
                         # of the file
                         fp.seek(0)
-                        file_.update(fp)
+                        await file_.update(fp)
                         break
                 else:
                     raise RuntimeError("Could not create a new file at "

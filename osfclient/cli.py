@@ -18,7 +18,10 @@ from tzlocal import get_localzone
 
 from .api import OSF
 from .exceptions import UnauthorizedException
-from .utils import norm_remote_path, split_storage, makedirs, checksum, is_path_matched
+from .utils import (
+    norm_remote_path, split_storage, makedirs, checksum, is_path_matched,
+    ensure_async_generator
+)
 
 
 def config_from_file():
@@ -158,7 +161,7 @@ def init(args):
 
 
 @might_need_auth
-def clone(args):
+async def clone(args):
     """Copy all files from all storages of a project.
 
     The output directory defaults to the current directory.
@@ -169,16 +172,16 @@ def clone(args):
     remote files differ.
     """
     osf = _setup_osf(args)
-    project = osf.project(args.project)
+    project = await osf.project(args.project)
     output_dir = args.project
     if args.output is not None:
         output_dir = args.output
 
     with tqdm(unit='files') as pbar:
-        for store in project.storages:
+        async for store in ensure_async_generator(project.storages):
             prefix = os.path.join(output_dir, store.name)
 
-            for file_ in store.files:
+            async for file_ in ensure_async_generator(store.files):
                 path = file_.path
                 if path.startswith('/'):
                     path = path[1:]
@@ -191,13 +194,13 @@ def clone(args):
                 makedirs(directory, exist_ok=True)
 
                 with open(path, "wb") as f:
-                    file_.write_to(f)
+                    await file_.write_to(f)
 
                 pbar.update()
 
 
 @might_need_auth
-def fetch(args):
+async def fetch(args):
     """Fetch an individual file from a project.
 
     The first part of the remote path is interpreted as the name of the
@@ -227,7 +230,7 @@ def fetch(args):
         makedirs(directory, exist_ok=True)
 
     osf = _setup_osf(args)
-    project = osf.project(args.project)
+    project = await osf.project(args.project)
     if args.base_path is not None:
         base_path = args.base_path
         if base_path.startswith('/'):
@@ -239,31 +242,31 @@ def fetch(args):
     else:
         path_filter = None
 
-    store = project.storage(storage)
+    store = await project.storage(storage)
     files = store.files if path_filter is None \
             else store.matched_files(path_filter)
-    for file_ in files:
+    async for file_ in ensure_async_generator(files):
         if norm_remote_path(file_.path) == remote_path:
             if local_path_exists and not args.force and args.update:
                 if file_.hashes.get('md5') == checksum(local_path):
                     print("Local file %s already matches remote." % local_path)
                     break
             with open(local_path, 'wb') as fp:
-                file_.write_to(fp)
+                await file_.write_to(fp)
 
             # only fetching one file so we are done
             break
 
 
 @might_need_auth
-def list_(args):
+async def list_(args):
     """List all files from all storages for project.
 
     If the project is private you need to specify a username or token.
     """
     osf = _setup_osf(args)
 
-    project = osf.project(args.project)
+    project = await osf.project(args.project)
     if args.base_path is not None:
         base_path = args.base_path
         if base_path.startswith('/'):
@@ -277,13 +280,13 @@ def list_(args):
         base_provider = None
         path_filter = None
 
-    for store in project.storages:
+    async for store in ensure_async_generator(project.storages):
         prefix = store.name
         if base_provider is not None and base_provider != prefix:
             continue
         files = store.files if path_filter is None \
                 else store.matched_files(path_filter)
-        for file_ in files:
+        async for file_ in ensure_async_generator(files):
             path = file_.path
             if path.startswith('/'):
                 path = path[1:]
@@ -302,10 +305,11 @@ def list_(args):
                 print('%s %s %s' % (smodified, sfsize, full_path))
             else:
                 print(full_path)
+    await osf.aclose()
 
 
 @might_need_auth
-def upload(args):
+async def upload(args):
     """Upload a new file to an existing project.
 
     The first part of the remote path is interpreted as the name of the
@@ -330,10 +334,10 @@ def upload(args):
         sys.exit('To upload a file you need to provide a username and'
                  ' password or token.')
 
-    project = osf.project(args.project)
+    project = await osf.project(args.project)
     storage, remote_path = split_storage(args.destination)
 
-    store = project.storage(storage)
+    store = await project.storage(storage)
     if args.recursive:
         if not os.path.isdir(args.source):
             raise RuntimeError("Expected source ({}) to be a directory when "
@@ -350,17 +354,17 @@ def upload(args):
                     # build the remote path + fname
                     name = os.path.join(remote_path, dir_name, subdir_path,
                                         fname)
-                    store.create_file(name, fp, force=args.force,
-                                      update=args.update)
+                    await store.create_file(name, fp, force=args.force,
+                                            update=args.update)
 
     else:
         with open(args.source, 'rb') as fp:
-            store.create_file(remote_path, fp, force=args.force,
-                              update=args.update)
+            await store.create_file(remote_path, fp, force=args.force,
+                                    update=args.update)
 
 
 @might_need_auth
-def makefolder(args):
+async def makefolder(args):
     """Create a new folder in an existing project.
 
     The first part of the remote path is interpreted as the name of the
@@ -372,11 +376,11 @@ def makefolder(args):
         sys.exit('To create a folder you need to provide a username and'
                  ' password or token.')
 
-    project = osf.project(args.project)
+    project = await osf.project(args.project)
 
     storage, remote_path = split_storage(args.target)
 
-    store = project.storage(storage)
+    store = await project.storage(storage)
     folders = []
     for f in store.folders:
         if remote_path.startswith(norm_remote_path(f.path) + os.path.sep):
@@ -390,11 +394,11 @@ def makefolder(args):
         parent_path_segments = norm_remote_path(parent.path).split(os.path.sep)
     remote_path_segments = remote_path.split(os.path.sep)
     for foldername in remote_path_segments[len(parent_path_segments):]:
-        parent = parent.create_folder(foldername)
+        parent = await parent.create_folder(foldername)
 
 
 @might_need_auth
-def remove(args):
+async def remove(args):
     """Remove a file from the project's storage.
 
     The first part of the remote path is interpreted as the name of the
@@ -406,23 +410,23 @@ def remove(args):
         sys.exit('To remove a file you need to provide a username and'
                  ' password or token.')
 
-    project = osf.project(args.project)
+    project = await osf.project(args.project)
 
     storage, remote_path = split_storage(args.target)
 
-    store = project.storage(storage)
+    store = await project.storage(storage)
     for f in store.files:
         if norm_remote_path(f.path) == remote_path:
-            f.remove()
+            await f.remove()
             return
     for f in store.folders:
         if norm_remote_path(f.path) == remote_path:
-            f.remove()
+            await f.remove()
             return
 
 
 @might_need_auth
-def move(args):
+async def move(args):
     """Move a file to specified location on the project's storage.
 
     The first part of the paths is interpreted as the name of the
@@ -434,7 +438,7 @@ def move(args):
         sys.exit('To move a file you need to provide a username and'
                  ' password or token.')
 
-    project = osf.project(args.project)
+    project = await osf.project(args.project)
 
     target_storage, target_path = split_storage(args.target, normalize=False)
 
@@ -451,37 +455,37 @@ def move(args):
     else:
         target_folder_path = None
         target_filename = target_path
-    target_store = project.storage(target_storage)
+    target_store = await project.storage(target_storage)
     if target_folder_path is None:
         target_folder = target_store
     else:
-        target_folder = _ensure_folder(target_store, target_folder_path)
+        target_folder = await _ensure_folder(target_store, target_folder_path)
 
     # Move a file
     storage, remote_path = split_storage(args.source)
 
-    store = project.storage(storage)
+    store = await project.storage(storage)
     for f in store.files:
         if norm_remote_path(f.path) == remote_path:
-            f.move_to(target_storage, target_folder,
-                      to_filename=target_filename, force=args.force)
+            await f.move_to(target_storage, target_folder,
+                            to_filename=target_filename, force=args.force)
             return
     for f in store.folders:
         if norm_remote_path(f.path) == remote_path:
-            f.move_to(target_storage, target_folder,
-                      to_foldername=target_filename, force=args.force)
+            await f.move_to(target_storage, target_folder,
+                            to_foldername=target_filename, force=args.force)
             return
 
 
-def _ensure_folder(store, path):
+async def _ensure_folder(store, path):
     folder = None
-    for f in store.folders:
+    async for f in ensure_async_generator(store.folders):
         if norm_remote_path(f.path) == path:
             folder = f
     if folder is not None:
         return folder
     if '/' in path:
-        parent = _ensure_folder(store, path[:path.index('/')])
-        return parent.create_folder(path[path.index('/') + 1:])
+        parent = await _ensure_folder(store, path[:path.index('/')])
+        return await parent.create_folder(path[path.index('/') + 1:])
     else:
-        return store.create_folder(path)
+        return await store.create_folder(path)

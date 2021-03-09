@@ -1,11 +1,10 @@
-import requests
+import httpx
 
 from ..exceptions import UnauthorizedException
 
 
-class OSFSession(requests.Session):
+class OSFSession(httpx.AsyncClient):
     auth = None
-    __attrs__ = requests.Session.__attrs__ + ['base_url']
 
     def __init__(self):
         """Handle HTTP session related work."""
@@ -34,19 +33,19 @@ class OSFSession(requests.Session):
         self.headers['Authorization'] = 'Bearer ' + token
 
     def build_url(self, *args):
-        parts = [self.base_url]
+        parts = [str(self.base_url)]
         parts.extend(args)
         # canonical OSF URLs end with a slash
         return '/'.join(parts) + '/'
 
-    def put(self, url, *args, **kwargs):
-        response = super(OSFSession, self).put(url, *args, **kwargs)
+    async def put(self, url, *args, **kwargs):
+        response = await super(OSFSession, self).put(url, *args, **kwargs)
         if response.status_code == 401:
             raise UnauthorizedException()
         return response
 
-    def get(self, url, *args, **kwargs):
-        response = super(OSFSession, self).get(url, *args, **kwargs)
+    async def get(self, url, *args, **kwargs):
+        response = await super(OSFSession, self).get(url, *args, **kwargs)
         if response.status_code == 401:
             raise UnauthorizedException()
         return response

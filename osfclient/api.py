@@ -19,6 +19,9 @@ class OSF(OSFCore):
         elif token is not None:
             self.login_by_token(token)
 
+    async def aclose(self):
+        await self.session.aclose()
+
     def login(self, username, password=None):
         """Login user for protected API calls."""
         self.session.basic_auth(username, password)
@@ -27,17 +30,17 @@ class OSF(OSFCore):
         """Login user for protected API calls using Access Token."""
         self.session.token_auth(token)
 
-    def project(self, project_id):
+    async def project(self, project_id):
         """Fetch project `project_id`."""
-        type_ = self.guid(project_id)
+        type_ = await self.guid(project_id)
         url = self._build_url(type_, project_id)
         if type_ in Project._types:
-            return Project(self._json(self._get(url), 200), self.session)
+            return Project(self._json(await self._get(url), 200), self.session)
         raise OSFException('{} is unrecognized type {}. Clone supports projects and registrations'.format(project_id, type_))
 
-    def guid(self, guid):
+    async def guid(self, guid):
         """Determines JSONAPI type for provided GUID"""
-        return self._json(self._get(self._build_url('guids', guid)), 200)['data']['type']
+        return self._json(await self._get(self._build_url('guids', guid)), 200)['data']['type']
 
     @property
     def username(self):

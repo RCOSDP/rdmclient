@@ -10,6 +10,10 @@ import six
 KNOWN_PROVIDERS = ['osfstorage', 'github', 'figshare', 'googledrive']
 
 
+async def _async_generator(l):
+    for elem in l:
+        yield elem
+
 def norm_remote_path(path):
     """Normalize `path`.
 
@@ -128,3 +132,9 @@ def is_path_matched(target_file_path, fileobj):
             if file_path_seg != target_file_path_seg:
                 return False
     return True
+
+
+def ensure_async_generator(g):
+    if hasattr(g, '__aiter__'):
+        return g
+    return _async_generator(g)

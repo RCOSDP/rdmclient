@@ -77,7 +77,7 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            'osf=osfclient.__main__:main',
+            'osf=osfclient.__main__:run_main',
         ],
     },
 )

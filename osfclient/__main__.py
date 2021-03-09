@@ -1,4 +1,5 @@
 from __future__ import print_function
+import asyncio
 import sys
 import six
 import argparse
@@ -8,7 +9,7 @@ from .cli import clone, fetch, list_, makefolder, remove, move, upload, init
 from . import __version__
 
 
-def main():
+async def main():
     description = dedent("""
     osf is a command-line program to up and download
     files from osf.io.
@@ -133,7 +134,7 @@ def main():
         # this setup is so we can print usage for the sub command
         # even if there was an error further down
         try:
-            exit_code = args.func(args)
+            exit_code = await args.func(args)
         except SystemExit as e:
             exit_code = e.code
 
@@ -148,5 +149,9 @@ def main():
         parser.print_help()
 
 
+def run_main():
+    asyncio.run(main())
+
+
 if __name__ == "__main__":
-    main()
+    run_main()

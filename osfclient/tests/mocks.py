@@ -1,5 +1,12 @@
+import asyncio
 from mock import MagicMock, PropertyMock
 from ..utils import norm_remote_path, is_path_matched
+
+
+def FutureWrapper(value=None):
+    f = asyncio.Future()
+    f.set_result(value)
+    return f
 
 
 # When using a PropertyMock store it as an attribute
@@ -14,6 +21,9 @@ def MockFile(name):
     hashes = PropertyMock(return_value=hashes_dict)
     type(mock).hashes = hashes
     mock._hashes_mock = hashes
+    mock.write_to = MagicMock(return_value=FutureWrapper())
+    mock.move_to = MagicMock(return_value=FutureWrapper())
+    mock.remove = MagicMock(return_value=FutureWrapper())
     return mock
 
 
@@ -25,6 +35,10 @@ def MockFolder(name):
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name
+    mock.move_to = MagicMock(return_value=FutureWrapper())
+    mock.create_file = MagicMock(return_value=FutureWrapper())
+    mock.create_folder = MagicMock(side_effect=lambda name: FutureWrapper(mock))
+    mock.remove = MagicMock(return_value=FutureWrapper())
     return mock
 
 
@@ -32,8 +46,11 @@ def MockStorage(name):
     def make_matched_files(mock):
         def make_raw_file(file):
             return {'attributes': {'materialized_path': '/' + norm_remote_path(file._path_mock.return_value)}}
-        def matched_files(target_filter):
-            return [f for f in mock.files if target_filter(make_raw_file(f))]
+        async def matched_files(target_filter):
+            for f in mock.files:
+                if not target_filter(make_raw_file(f)):
+                    continue
+                yield f
         return matched_files
 
     mock = MagicMock(name='Storage-%s' % name,
@@ -46,14 +63,22 @@ def MockStorage(name):
     matched_files = MagicMock(side_effect=make_matched_files(mock))
     type(mock).matched_files = matched_files
     mock._matched_files_mock = matched_files
+    mock.create_file = MagicMock(return_value=FutureWrapper())
+    mock.create_folder = MagicMock(side_effect=lambda name: FutureWrapper(MockFolder(name)))
     return mock
+
+
+def FutureMockStorage(name):
+    f = asyncio.Future()
+    f.set_result(MockStorage(name))
+    return f
 
 
 def MockProject(name):
     mock = MagicMock(name='Project-%s' % name,
                      storages=[MockStorage('osfstorage'), MockStorage('gh')])
     storage = MagicMock(name='Project-%s-storage' % name,
-                        return_value=MockStorage('osfstorage'))
+                        return_value=FutureMockStorage('osfstorage'))
     type(mock).storage = storage
     mock._storage_mock = storage
 
@@ -116,3 +141,7 @@ class FakeResponse:
 
     def json(self):
         return self._json
+
+
+def FutureFakeResponse(status_code, json):
+    return FutureWrapper(FakeResponse(status_code, json))

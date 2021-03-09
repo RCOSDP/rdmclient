@@ -13,17 +13,18 @@ from osfclient.tests.mocks import MockProject
 from osfclient.tests.mocks import MockArgs
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch('osfclient.cli.os.path.exists', return_value=False)
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_file(OSF_project, os_path_exists, os_makedirs):
+async def test_fetch_file(OSF_project, os_path_exists, os_makedirs):
     # check that `osf fetch` opens the right files with the right name and mode
     args = MockArgs(project='1234', remote='osfstorage/a/a/a')
 
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -35,10 +36,11 @@ def test_fetch_file(OSF_project, os_path_exists, os_makedirs):
     assert mock.call('a', 'wb') in mock_open_func.mock_calls
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch('osfclient.cli.os.path.exists', return_value=False)
 @patch('osfclient.cli.OSF.project', return_value=MockProject('1234'))
-def test_fetch_file_local_name_specified(OSF_project, os_path_exists,
+async def test_fetch_file_local_name_specified(OSF_project, os_path_exists,
                                          os_makedirs):
     # check that `osf fetch` opens the right files with the right name
     # and mode when specifying a local filename
@@ -48,13 +50,13 @@ def test_fetch_file_local_name_specified(OSF_project, os_path_exists,
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
 
     # check that the project and the files have been accessed
     project = OSF_project.return_value
-    store = project._storage_mock.return_value
+    store = await project._storage_mock.return_value
     assert store._name_mock.return_value == 'osfstorage'
 
     expected = [call._path_mock(), call.write_to(mock_open_func())]
@@ -68,10 +70,11 @@ def test_fetch_file_local_name_specified(OSF_project, os_path_exists,
     assert not os_makedirs.called
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch('osfclient.cli.os.path.exists', return_value=False)
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_file_local_dir_specified(OSF_project, os_path_exists,
+async def test_fetch_file_local_dir_specified(OSF_project, os_path_exists,
                                         os_makedirs):
     # check that `osf fetch` opens the right files with the right name
     # and mode when specifying a local filename
@@ -81,7 +84,7 @@ def test_fetch_file_local_dir_specified(OSF_project, os_path_exists,
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -93,8 +96,9 @@ def test_fetch_file_local_dir_specified(OSF_project, os_path_exists,
     assert mock.call('subdir', exist_ok=True) in os_makedirs.mock_calls
 
 
+@pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_local_file_exists(OSF_project):
+async def test_fetch_local_file_exists(OSF_project):
     # check that `osf fetch` opens the right files with the right name
     # and mode when specifying a local filename
     args = MockArgs(project='1234', remote='osfstorage/a/a/a',
@@ -108,14 +112,15 @@ def test_fetch_local_file_exists(OSF_project):
 
     with patch('osfclient.cli.os.path.exists', side_effect=exists):
         with pytest.raises(SystemExit) as e:
-            fetch(args)
+            await fetch(args)
 
     assert 'already exists, not overwriting' in e.value.args[0]
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_local_file_exists_force(OSF_project, os_makedirs):
+async def test_fetch_local_file_exists_force(OSF_project, os_makedirs):
     # check that `osf fetch --force` overwrites the local files if it exists
     args = MockArgs(project='1234', remote='osfstorage/a/a/a', force=True)
 
@@ -129,7 +134,7 @@ def test_fetch_local_file_exists_force(OSF_project, os_makedirs):
 
     with patch('osfclient.cli.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
-            fetch(args)
+            await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -141,9 +146,10 @@ def test_fetch_local_file_exists_force(OSF_project, os_makedirs):
     assert mock.call('a', 'wb') in mock_open_func.mock_calls
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_local_file_exists_update_files_differ(OSF_project, os_makedirs):
+async def test_fetch_local_file_exists_update_files_differ(OSF_project, os_makedirs):
     # check that `osf fetch --update` overwrites an existing local file if it
     # differs from the remote
     args = MockArgs(project='1234', remote='osfstorage/a/a/a', update=True)
@@ -162,7 +168,7 @@ def test_fetch_local_file_exists_update_files_differ(OSF_project, os_makedirs):
     with patch('osfclient.cli.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
             with patch('osfclient.cli.checksum', side_effect=simple_checksum):
-                fetch(args)
+                await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -174,9 +180,10 @@ def test_fetch_local_file_exists_update_files_differ(OSF_project, os_makedirs):
     assert mock.call('a', 'wb') in mock_open_func.mock_calls
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_local_file_exists_update_files_match(OSF_project, os_makedirs):
+async def test_fetch_local_file_exists_update_files_match(OSF_project, os_makedirs):
     # check that `osf fetch --update` does not overwrite local file if it
     # matches the remote
     args = MockArgs(project='1234', remote='osfstorage/a/a/a', update=True)
@@ -195,7 +202,7 @@ def test_fetch_local_file_exists_update_files_match(OSF_project, os_makedirs):
     with patch('osfclient.cli.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
             with patch('osfclient.cli.checksum', side_effect=simple_checksum):
-                fetch(args)
+                await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -207,9 +214,10 @@ def test_fetch_local_file_exists_update_files_match(OSF_project, os_makedirs):
     assert mock.call('a', 'wb') not in mock_open_func.mock_calls
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_local_file_exists_force_overrides_update(OSF_project, os_makedirs):
+async def test_fetch_local_file_exists_force_overrides_update(OSF_project, os_makedirs):
     # check that `osf fetch --force --update` overwrites the local file even if
     # it matches the remote file (force overrides update)
     args = MockArgs(project='1234', remote='osfstorage/a/a/a', force=True,
@@ -229,7 +237,7 @@ def test_fetch_local_file_exists_force_overrides_update(OSF_project, os_makedirs
     with patch('osfclient.cli.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
             with patch('osfclient.cli.checksum', side_effect=simple_checksum):
-                fetch(args)
+                await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -243,21 +251,22 @@ def test_fetch_local_file_exists_force_overrides_update(OSF_project, os_makedirs
     assert mock.call('a', 'wb') in mock_open_func.mock_calls
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch('osfclient.cli.os.path.exists', return_value=False)
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_last_file(OSF_project, os_path_exists, os_makedirs):
+async def test_fetch_last_file(OSF_project, os_path_exists, os_makedirs):
     # check that `osf fetch` opens the right files with the right name and mode
     args = MockArgs(project='1234', remote='osfstorage/b/b/b')
 
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
-    store = OSF_project.return_value._storage_mock.return_value
+    store = await OSF_project.return_value._storage_mock.return_value
     assert store._name_mock.return_value == 'osfstorage'
 
     # should create a file in the same directory when no local
@@ -267,10 +276,11 @@ def test_fetch_last_file(OSF_project, os_path_exists, os_makedirs):
         assert f._path_mock.called
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch('osfclient.cli.os.path.exists', return_value=False)
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_file_with_base_path(OSF_project, os_path_exists, os_makedirs):
+async def test_fetch_file_with_base_path(OSF_project, os_path_exists, os_makedirs):
     # check that `osf fetch` opens the right files with the right name and mode
     args = MockArgs(project='1234', remote='osfstorage/b/b/b',
                     base_path='osfstorage/b/b/')
@@ -278,11 +288,11 @@ def test_fetch_file_with_base_path(OSF_project, os_path_exists, os_makedirs):
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
-    store = OSF_project.return_value._storage_mock.return_value
+    store = await OSF_project.return_value._storage_mock.return_value
     assert store._name_mock.return_value == 'osfstorage'
 
     # should create a file in the same directory when no local
@@ -294,10 +304,11 @@ def test_fetch_file_with_base_path(OSF_project, os_path_exists, os_makedirs):
         assert f._path_mock.called
 
 
+@pytest.mark.asyncio
 @patch('osfclient.cli.makedirs')
 @patch('osfclient.cli.os.path.exists', return_value=False)
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_file_with_invalid_base_path(OSF_project, os_path_exists, os_makedirs):
+async def test_fetch_file_with_invalid_base_path(OSF_project, os_path_exists, os_makedirs):
     # check that `osf fetch` opens the right files with the right name and mode
     args = MockArgs(project='1234', remote='osfstorage/b/b/b',
                     base_path='osfstorage/a/')
@@ -305,7 +316,7 @@ def test_fetch_file_with_invalid_base_path(OSF_project, os_path_exists, os_maked
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        await fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
