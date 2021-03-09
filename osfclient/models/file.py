@@ -4,12 +4,31 @@ from .core import OSFCore
 from ..exceptions import FolderExistsException, UnauthorizedException
 
 
+class tqdm_indeterminate(tqdm):
+    """Provide indeterminate progress bar
+    """
+    symbols = r'/-\|'
+    bar = 0
+
+    @property
+    def format_dict(self):
+        d = super(tqdm_indeterminate, self).format_dict
+        indeterminate_bar = self.symbols[self.bar]
+        self.bar = self.bar + 1 if self.bar + 1 < len(self.symbols) else 0
+        d.update(indeterminate_bar=indeterminate_bar)
+        return d
+
+
 def copyfileobj(fsrc, fdst, total, length=16*1024):
     """Copy data from file-like object fsrc to file-like object fdst
 
     This is like shutil.copyfileobj but with a progressbar.
     """
-    with tqdm(unit='bytes', total=total, unit_scale=True) as pbar:
+    format_ind_loop = '{indeterminate_bar} {elapsed}, {rate_fmt}'
+    with (tqdm(unit='bytes', total=total, unit_scale=True)
+          if total is not None else
+          tqdm_indeterminate(unit='bytes', unit_scale=True,
+                             bar_format=format_ind_loop)) as pbar:
         while 1:
             buf = fsrc.read(length)
             if not buf:
@@ -61,7 +80,8 @@ class File(OSFCore):
         if response.status_code == 200:
             response.raw.decode_content = True
             copyfileobj(response.raw, fp,
-                        int(response.headers['Content-Length']))
+                        int(response.headers['Content-Length'])
+                        if 'Content-Length' in response.headers else None)
 
         else:
             raise RuntimeError("Response has status "
