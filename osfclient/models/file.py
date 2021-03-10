@@ -73,10 +73,11 @@ class File(OSFCore):
         if 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
+        # TODO: streaming support
         try:
-            response = await self._get(self._download_url, stream=True)
+            response = await self._get(self._download_url)
         except UnauthorizedException:
-            response = await self._get(self._upload_url, stream=True)
+            response = await self._get(self._upload_url)
         if response.status_code == 200:
             response.raw.decode_content = True
             copyfileobj(response.raw, fp,
