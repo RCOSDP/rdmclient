@@ -1,4 +1,5 @@
 httpx
+requests
 tqdm
 six
 python-dateutil
