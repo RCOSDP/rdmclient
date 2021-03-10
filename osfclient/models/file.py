@@ -1,3 +1,4 @@
+import io
 from tqdm import tqdm
 
 from .core import OSFCore
@@ -79,8 +80,12 @@ class File(OSFCore):
         except UnauthorizedException:
             response = await self._get(self._upload_url)
         if response.status_code == 200:
-            response.raw.decode_content = True
-            copyfileobj(response.raw, fp,
+            if hasattr(response, 'raw'):
+                response.raw.decode_content = True
+                bodycontent = response.raw
+            else:
+                bodycontent = io.BytesIO(response.content)
+            copyfileobj(bodycontent, fp,
                         int(response.headers['Content-Length'])
                         if 'Content-Length' in response.headers else None)
 
