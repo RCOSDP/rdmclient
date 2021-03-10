@@ -62,6 +62,18 @@ class Storage(OSFCore, ContainerMixin):
         return self._iter_children(self._files_url, 'folder', Folder,
                                    self._files_key)
 
+    @property
+    def child_files(self):
+        """Iterate child files in this storage.
+        """
+        return self._iter_children(self._files_url, 'file', File)
+
+    @property
+    def child_folders(self):
+        """Iterate child folders in this storage.
+        """
+        return self._iter_children(self._files_url, 'folder', Folder)
+
     def matched_files(self, target_filter):
         """Iterate all matched files in this storage.
 
