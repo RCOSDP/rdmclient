@@ -105,17 +105,17 @@ class File(OSFCore):
         Pass in a filepointer `fp` that has been opened for writing in
         binary mode.
         """
-        if 'b' not in fp.mode:
-            raise ValueError("File has to be opened in binary mode.")
+        #if 'b' not in fp.mode:
+        #    raise ValueError("File has to be opened in binary mode.")
 
         url = self._upload_url
         # peek at the file to check if it is an ampty file which needs special
         # handling in requests. If we pass a file like object to data that
         # turns out to be of length zero then no file is created on the OSF
-        if fp.peek(1):
-            response = await self._put(url, data=fp)
-        else:
-            response = await self._put(url, data=b'')
+        #if fp.peek(1):
+        #    response = await self._put(url, data=fp)
+        #else:
+        response = await self._put(url, data=b'')
 
         if response.status_code != 200:
             msg = ('Could not update {} (status '
@@ -186,7 +186,7 @@ class ContainerMixin:
             raise FolderExistsException(name)
 
         elif response.status_code == 409 and exist_ok:
-            for folder in self.folders:
+            async for folder in self.folders:
                 if folder.name == name:
                     return folder
 
