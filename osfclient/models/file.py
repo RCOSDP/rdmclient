@@ -113,9 +113,9 @@ class File(OSFCore):
         # handling in requests. If we pass a file like object to data that
         # turns out to be of length zero then no file is created on the OSF
         #if fp.peek(1):
-        #    response = await self._put(url, data=fp)
+        response = await self._put(url, data=fp)
         #else:
-        response = await self._put(url, data=b'')
+        #    response = await self._put(url, data=b'')
 
         if response.status_code != 200:
             msg = ('Could not update {} (status '
