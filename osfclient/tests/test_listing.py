@@ -124,7 +124,7 @@ async def test_list(capsys):
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2//nodes/f3szh/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/':
             return FakeResponse(200, njson)
         elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
@@ -134,7 +134,7 @@ async def test_list(capsys):
             return FakeResponse(200, fjson1)
         elif url == 'https://api.osf.io/v2/nodes/9zpcy/files/osfstorage/folder2123/':
             return FakeResponse(200, fjson2)
-        elif url == 'https://api.osf.io/v2//guids/f3szh/':
+        elif url == 'https://api.osf.io/v2/guids/f3szh/':
             return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)
@@ -167,7 +167,7 @@ async def test_sublist_exists(capsys):
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2//nodes/f3szh/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/':
             return FakeResponse(200, njson)
         elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
@@ -175,7 +175,7 @@ async def test_sublist_exists(capsys):
             return FakeResponse(200, rjson)
         elif url == 'https://api.osf.io/v2/nodes/9zpcy/files/osfstorage/folder2123/':
             return FakeResponse(200, fjson2)
-        elif url == 'https://api.osf.io/v2//guids/f3szh/':
+        elif url == 'https://api.osf.io/v2/guids/f3szh/':
             return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)
@@ -197,11 +197,11 @@ async def test_sublist_empty(capsys):
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2//nodes/f3szh/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/':
             return FakeResponse(200, njson)
         elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
-        elif url == 'https://api.osf.io/v2//guids/f3szh/':
+        elif url == 'https://api.osf.io/v2/guids/f3szh/':
             return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)
@@ -228,13 +228,13 @@ async def test_long_format_list(capsys):
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2//nodes/f3szh/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/':
             return FakeResponse(200, njson)
         elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
         elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
             return FakeResponse(200, fjson)
-        elif url == 'https://api.osf.io/v2//guids/f3szh/':
+        elif url == 'https://api.osf.io/v2/guids/f3szh/':
             return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)
@@ -266,13 +266,13 @@ async def test_long_format_list_with_null(capsys):
     sjson = fake_responses.storage_node('f3szh', ['osfstorage'])
 
     def simple_OSFCore_get(url):
-        if url == 'https://api.osf.io/v2//nodes/f3szh/':
+        if url == 'https://api.osf.io/v2/nodes/f3szh/':
             return FakeResponse(200, njson)
         elif url == 'https://api.osf.io/v2/nodes/f3szh/files/':
             return FakeResponse(200, sjson)
         elif url == 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/':
             return FakeResponse(200, fjson)
-        elif url == 'https://api.osf.io/v2//guids/f3szh/':
+        elif url == 'https://api.osf.io/v2/guids/f3szh/':
             return FakeResponse(200, {'data': {'type': 'nodes'}})
         else:
             print(url)

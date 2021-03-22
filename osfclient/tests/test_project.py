@@ -13,7 +13,7 @@ from osfclient.tests.mocks import FakeResponse
 @patch.object(OSFCore, '_get')
 async def test_invalid_storage(OSFCore_get):
     project = Project({})
-    project._storages_url = 'https://api.osf.io/v2//nodes/f3szh/files/'
+    project._storages_url = 'https://api.osf.io/v2/nodes/f3szh/files/'
 
     response = FakeResponse(200, fake_responses.storage_node('f3szh'))
     OSFCore_get.return_value = response
@@ -22,14 +22,14 @@ async def test_invalid_storage(OSFCore_get):
         await project.storage('does-not-exist')
 
     OSFCore_get.assert_called_once_with(
-        'https://api.osf.io/v2//nodes/f3szh/files/')
+        'https://api.osf.io/v2/nodes/f3szh/files/')
 
 
 @pytest.mark.asyncio
 @patch.object(OSFCore, '_get')
 async def test_valid_storage(OSFCore_get):
     project = Project({})
-    project._storages_url = 'https://api.osf.io/v2//nodes/f3szh/files/'
+    project._storages_url = 'https://api.osf.io/v2/nodes/f3szh/files/'
 
     response = FakeResponse(200, fake_responses.storage_node('f3szh'))
     OSFCore_get.return_value = response
@@ -37,7 +37,7 @@ async def test_valid_storage(OSFCore_get):
     storage = await project.storage('osfstorage')
 
     OSFCore_get.assert_called_once_with(
-        'https://api.osf.io/v2//nodes/f3szh/files/')
+        'https://api.osf.io/v2/nodes/f3szh/files/')
     assert isinstance(storage, Storage)
 
 
@@ -45,7 +45,7 @@ async def test_valid_storage(OSFCore_get):
 @patch.object(OSFCore, '_get')
 async def test_iterate_storages(OSFCore_get):
     project = Project({})
-    project._storages_url = 'https://api.osf.io/v2//nodes/f3szh/files/'
+    project._storages_url = 'https://api.osf.io/v2/nodes/f3szh/files/'
 
     store_json = fake_responses.storage_node('f3szh',
                                              ['osfstorage', 'github'])
@@ -61,7 +61,7 @@ async def test_iterate_storages(OSFCore_get):
         assert isinstance(store, Storage)
 
     OSFCore_get.assert_called_once_with(
-        'https://api.osf.io/v2//nodes/f3szh/files/')
+        'https://api.osf.io/v2/nodes/f3szh/files/')
 
 
 @pytest.mark.asyncio
@@ -69,7 +69,7 @@ async def test_iterate_storages(OSFCore_get):
 async def test_pass_down_session_to_storage(OSFCore_get):
     # check that `self.session` is passed to newly created OSFCore instances
     project = Project({})
-    project._storages_url = 'https://api.osf.io/v2//nodes/f3szh/files/'
+    project._storages_url = 'https://api.osf.io/v2/nodes/f3szh/files/'
 
     store_json = fake_responses.storage_node('f3szh')
     response = FakeResponse(200, store_json)
@@ -85,7 +85,7 @@ async def test_pass_down_session_to_storage(OSFCore_get):
 async def test_pass_down_session_to_storages(OSFCore_get):
     # as previous test but for multiple storages
     project = Project({})
-    project._storages_url = 'https://api.osf.io/v2//nodes/f3szh/files/'
+    project._storages_url = 'https://api.osf.io/v2/nodes/f3szh/files/'
 
     store_json = fake_responses.storage_node('f3szh')
     response = FakeResponse(200, store_json)

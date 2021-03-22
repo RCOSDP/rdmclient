@@ -61,7 +61,7 @@ async def test_get_project(OSFCore_get):
     osf = OSF()
     project = await osf.project('f3szh')
 
-    calls = [call('https://api.osf.io/v2//guids/f3szh/'), call('https://api.osf.io/v2//nodes/f3szh/')]
+    calls = [call('https://api.osf.io/v2/guids/f3szh/'), call('https://api.osf.io/v2/nodes/f3szh/')]
     OSFCore_get.assert_has_calls(calls)
     assert isinstance(project, Project)
 
@@ -72,7 +72,7 @@ async def test_get_registration(OSFCore_get):
     osf = OSF()
     project = await osf.project('f3szh')
 
-    calls = [call('https://api.osf.io/v2//guids/f3szh/'), call('https://api.osf.io/v2//registrations/f3szh/')]
+    calls = [call('https://api.osf.io/v2/guids/f3szh/'), call('https://api.osf.io/v2/registrations/f3szh/')]
     OSFCore_get.assert_has_calls(calls)
     assert isinstance(project, Project)
 
@@ -86,7 +86,7 @@ async def test_get_fake(OSFCore_get):
 
     assert exc.value.args[0] == 'f3szh is unrecognized type fakes. Clone supports projects and registrations'
     OSFCore_get.assert_called_once_with(
-        'https://api.osf.io/v2//guids/f3szh/'
+        'https://api.osf.io/v2/guids/f3szh/'
         )
 
 
@@ -98,7 +98,7 @@ async def test_failed_get_project(OSFCore_get):
         await osf.project('f3szh')
 
     OSFCore_get.assert_called_once_with(
-        'https://api.osf.io/v2//guids/f3szh/'
+        'https://api.osf.io/v2/guids/f3szh/'
         )
 
 
@@ -108,6 +108,6 @@ async def test_get_project_with_endpoint(OSFCore_get):
     osf = OSF(base_url='https://api.test.osf.io/v2/')
     project = await osf.project('f3szh')
 
-    calls = [call('https://api.test.osf.io/v2//guids/f3szh/'), call('https://api.test.osf.io/v2//nodes/f3szh/')]
+    calls = [call('https://api.test.osf.io/v2/guids/f3szh/'), call('https://api.test.osf.io/v2/nodes/f3szh/')]
     OSFCore_get.assert_has_calls(calls)
     assert isinstance(project, Project)

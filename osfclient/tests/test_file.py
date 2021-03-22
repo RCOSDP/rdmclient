@@ -16,7 +16,7 @@ from osfclient.models.file import _WaterButlerFolder
 from osfclient.tests import fake_responses
 from osfclient.tests.mocks import FutureFakeResponse, FakeResponse, MockFolder
 
-_files_url = 'https://api.osf.io/v2//nodes/f3szh/files/osfstorage/foo123'
+_files_url = 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/foo123'
 
 
 @pytest.mark.asyncio
@@ -40,7 +40,7 @@ async def test_iterate_files(OSFCore_get):
         assert file_.session == store.session
 
     OSFCore_get.assert_called_once_with(
-        'https://api.osf.io/v2//nodes/f3szh/files/osfstorage/foo123')
+        'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/foo123')
 
 
 @pytest.mark.asyncio
@@ -65,7 +65,7 @@ async def test_iterate_folders(OSFCore_get):
         assert folder.name in ('foo/bar', 'foo/baz')
 
     OSFCore_get.assert_called_once_with(
-        'https://api.osf.io/v2//nodes/f3szh/files/osfstorage/foo123')
+        'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/foo123')
 
 
 @pytest.mark.asyncio

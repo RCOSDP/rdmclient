@@ -33,7 +33,9 @@ class OSFSession(httpx.AsyncClient):
         self.headers['Authorization'] = 'Bearer ' + token
 
     def build_url(self, *args):
-        parts = [str(self.base_url)]
+        base_url = str(self.base_url)
+        base_url = base_url[:-1] if base_url.endswith('/') else base_url
+        parts = [base_url]
         parts.extend(args)
         # canonical OSF URLs end with a slash
         return '/'.join(parts) + '/'
