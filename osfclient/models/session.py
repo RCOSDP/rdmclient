@@ -41,13 +41,22 @@ class OSFSession(httpx.AsyncClient):
         return '/'.join(parts) + '/'
 
     async def put(self, url, *args, **kwargs):
-        response = await super(OSFSession, self).put(url, *args, **kwargs)
+        kwargs_ = self.modify_kwargs(kwargs)
+        response = await super(OSFSession, self).put(url, *args, **kwargs_)
         if response.status_code == 401:
             raise UnauthorizedException()
         return response
 
     async def get(self, url, *args, **kwargs):
-        response = await super(OSFSession, self).get(url, *args, **kwargs)
+        kwargs_ = self.modify_kwargs(kwargs)
+        response = await super(OSFSession, self).get(url, *args, **kwargs_)
         if response.status_code == 401:
             raise UnauthorizedException()
         return response
+
+    def modify_kwargs(self, kwargs):
+        if 'follow_redirects' in kwargs:
+            return kwargs
+        r = kwargs.copy()
+        r.update(dict(follow_redirects=True))
+        return r
