@@ -60,7 +60,8 @@ class File(OSFCore):
                                                  'attributes', 'date_modified')
         self.size = self._get_attribute(file, 'attributes', 'size')
         self.hashes = self._get_attribute(file,
-                                          'attributes', 'extra', 'hashes')
+                                          'attributes', 'extra', 'hashes',
+                                          default={})
 
     def __str__(self):
         return '<File [{0}, {1}]>'.format(self.id, self.path)
