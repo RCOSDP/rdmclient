@@ -14,7 +14,7 @@ from osfclient.exceptions import FolderExistsException, UnauthorizedException
 from osfclient.models.file import _WaterButlerFolder
 
 from osfclient.tests import fake_responses
-from osfclient.tests.mocks import FutureFakeResponse, FakeResponse, MockFolder
+from osfclient.tests.mocks import FutureFakeResponse, FutureStreamResponse, FakeResponse, MockFolder
 
 _files_url = 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage/foo123'
 
@@ -248,7 +248,6 @@ async def test_move_folder_failed():
     f = Folder({})
     f.path = 'some/path'
     f._move_url = 'http://move.me/uri'
-    # TODO
     f._post = MagicMock(return_value=FutureFakeResponse(204, {'data': {}}))
 
     folder = Folder({})
@@ -280,25 +279,20 @@ async def test_file_uses_streaming_request():
     fp.mode = "b"
     file_content = b"hello world"
 
-    def fake_get(url, stream):
-        raw = MagicMock()
-        src = io.BytesIO(file_content)
-        raw.read = src.read
-
+    def fake_stream(method, url):
         res = FakeResponse(200, {})
-        res.raw = raw
-        res.headers = {'Content-Length': str(len(file_content))}
-        return res
+        res.raw = file_content
+        return FutureStreamResponse(res)
 
-    with patch.object(File, "_get", side_effect=fake_get) as mock_get:
+    with patch.object(File, "_stream", side_effect=fake_stream) as mock_stream:
         f = File({})
         f._download_url = "http://example.com/download_url/"
         await f.write_to(fp)
 
     fp.seek(0)
     assert file_content == fp.read()
-    expected = call('http://example.com/download_url/', stream=True)
-    assert expected in mock_get.mock_calls
+    expected = call('GET', 'http://example.com/download_url/')
+    assert expected in mock_stream.mock_calls
 
 
 @pytest.mark.asyncio
@@ -308,25 +302,20 @@ async def test_file_uses_streaming_request_without_content_length():
     fp.mode = "b"
     file_content = b"hello world"
 
-    def fake_get(url, stream):
-        raw = MagicMock()
-        src = io.BytesIO(file_content)
-        raw.read = src.read
-
+    def fake_stream(method, url):
         res = FakeResponse(200, {})
-        res.raw = raw
-        res.headers = {}
-        return res
+        res.raw = file_content
+        return FutureStreamResponse(res)
 
-    with patch.object(File, "_get", side_effect=fake_get) as mock_get:
+    with patch.object(File, "_stream", side_effect=fake_stream) as mock_stream:
         f = File({})
         f._download_url = "http://example.com/download_url/"
         await f.write_to(fp)
 
     fp.seek(0)
     assert file_content == fp.read()
-    expected = call('http://example.com/download_url/', stream=True)
-    assert expected in mock_get.mock_calls
+    expected = call('GET', 'http://example.com/download_url/')
+    assert expected in mock_stream.mock_calls
 
 
 @pytest.mark.asyncio
@@ -339,20 +328,15 @@ async def test_file_with_new_api():
     web_url = "http://example.com/download_url/"
     api_url = "http://example.com/upload_url/"
 
-    def fake_get(url, stream):
-        raw = MagicMock()
-        src = io.BytesIO(file_content)
-        raw.read = src.read
-
+    def fake_stream(method, url):
         if url == web_url:
             raise UnauthorizedException()
         else:
             res = FakeResponse(200, {})
-        res.raw = raw
-        res.headers = {'Content-Length': str(len(file_content))}
-        return res
+        res.raw = file_content
+        return FutureStreamResponse(res)
 
-    with patch.object(File, "_get", side_effect=fake_get) as mock_get:
+    with patch.object(File, "_stream", side_effect=fake_stream) as mock_stream:
         f = File({})
         f._download_url = web_url
         f._upload_url = api_url
@@ -360,8 +344,8 @@ async def test_file_with_new_api():
 
     fp.seek(0)
     assert file_content == fp.read()
-    expected = call('http://example.com/download_url/', stream=True)
-    assert expected in mock_get.mock_calls
+    expected = call('GET', 'http://example.com/download_url/')
+    assert expected in mock_stream.mock_calls
 
 
 @pytest.mark.asyncio
@@ -447,7 +431,6 @@ async def test_move_file_failed():
     f = File({})
     f.path = 'some/path'
     f._move_url = 'http://move.me/uri'
-    # TODO
     f._post = MagicMock(return_value=FutureFakeResponse(204, {'data': {}}))
 
     folder = Folder({})

@@ -2,6 +2,7 @@ import io
 from tqdm import tqdm
 
 from .core import OSFCore
+from ..utils import ensure_async_generator
 from ..exceptions import FolderExistsException, UnauthorizedException
 
 
@@ -72,27 +73,25 @@ class File(OSFCore):
         Pass in a filepointer `fp` that has been opened for writing in
         binary mode.
         """
-        if 'b' not in fp.mode:
+        if hasattr(fp, 'mode') and 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
-        # TODO: streaming support
         try:
-            response = await self._get(self._download_url)
+            await self._write_to(fp, self._download_url)
         except UnauthorizedException:
-            response = await self._get(self._upload_url)
-        if response.status_code == 200:
-            if hasattr(response, 'raw'):
-                response.raw.decode_content = True
-                bodycontent = response.raw
-            else:
-                bodycontent = io.BytesIO(response.content)
-            copyfileobj(bodycontent, fp,
-                        int(response.headers['Content-Length'])
-                        if 'Content-Length' in response.headers else None)
+            await self._write_to(fp, self._upload_url)
 
-        else:
-            raise RuntimeError("Response has status "
-                               "code {}.".format(response.status_code))
+    async def _write_to(self, fp, url):
+        async with self._stream('GET', url) as response:
+            if response.status_code == 401:
+                raise UnauthorizedException()
+            if response.status_code == 200:
+                async for data in response.aiter_bytes():
+                    fp.write(data)
+                fp.flush()
+            else:
+                raise RuntimeError("Response has status "
+                                "code {}.".format(response.status_code))
 
     async def remove(self):
         """Remove this file from the remote storage."""
@@ -106,17 +105,17 @@ class File(OSFCore):
         Pass in a filepointer `fp` that has been opened for writing in
         binary mode.
         """
-        #if 'b' not in fp.mode:
-        #    raise ValueError("File has to be opened in binary mode.")
+        if hasattr(fp, 'mode') and 'b' not in fp.mode:
+            raise ValueError("File has to be opened in binary mode.")
 
         url = self._upload_url
         # peek at the file to check if it is an ampty file which needs special
         # handling in requests. If we pass a file like object to data that
         # turns out to be of length zero then no file is created on the OSF
-        #if fp.peek(1):
-        response = await self._put(url, data=fp)
-        #else:
-        #    response = await self._put(url, data=b'')
+        if not hasattr(fp, 'peek') or fp.peek(1):
+            response = await self._put(url, data=fp)
+        else:
+            response = await self._put(url, data=b'')
 
         if response.status_code != 200:
             msg = ('Could not update {} (status '
@@ -187,7 +186,7 @@ class ContainerMixin:
             raise FolderExistsException(name)
 
         elif response.status_code == 409 and exist_ok:
-            async for folder in self.folders:
+            async for folder in ensure_async_generator(self.folders):
                 if folder.name == name:
                     return folder
 

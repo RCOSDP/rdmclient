@@ -49,6 +49,10 @@ class OSFSession(httpx.AsyncClient):
             raise UnauthorizedException()
         return response
 
+    def stream(self, method, url, *args, **kwargs):
+        kwargs_ = self.modify_kwargs(kwargs)
+        return super(OSFSession, self).stream(method, url, *args, **kwargs_)
+
     async def get(self, url, *args, **kwargs):
         kwargs_ = self.modify_kwargs(kwargs)
         response = await super(OSFSession, self).get(url, *args, **kwargs_)

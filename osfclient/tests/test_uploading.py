@@ -123,8 +123,8 @@ async def test_recursive_upload(OSF_project):
     assert call('foobar/baz/bar.txt', 'rb') in fake_open.mock_calls
     assert call('foobar/baz/abc.txt', 'rb') in fake_open.mock_calls
     # two directories with two files each -> four calls plus all the
-    # context manager __enter__ and __exit__ calls
-    assert len(fake_open.mock_calls) == 4 + 4*2
+    # context manager __enter__, __exit__ and close calls
+    assert len(fake_open.mock_calls) == 4 + 4*3
 
     fake_storage.assert_has_calls([
         call.create_file('BAR/./bar.txt', mock.ANY, force=False, update=False),
@@ -172,8 +172,8 @@ async def test_recursive_upload_with_subdir(OSF_project):
     assert call('foobar/baz/bar.txt', 'rb') in fake_open.mock_calls
     assert call('foobar/baz/abc.txt', 'rb') in fake_open.mock_calls
     # two directories with two files each -> four calls plus all the
-    # context manager __enter__ and __exit__ calls
-    assert len(fake_open.mock_calls) == 4 + 4*2
+    # context manager __enter__, __exit__, close calls
+    assert len(fake_open.mock_calls) == 4 + 4*3
 
     fake_storage.assert_has_calls([
         call.create_file('BAR/foobar/./bar.txt', mock.ANY,

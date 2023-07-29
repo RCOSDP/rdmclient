@@ -145,3 +145,26 @@ class FakeResponse:
 
 def FutureFakeResponse(status_code, json):
     return FutureWrapper(FakeResponse(status_code, json))
+
+
+class AsyncIterator:
+    def __init__(self, seq):
+        self.iter = iter(seq)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self.iter)
+        except StopIteration:
+            raise StopAsyncIteration
+
+
+class FutureStreamResponse(MagicMock):
+    def __init__(self, response):
+        super(FutureStreamResponse, self).__init__()
+        resp = MagicMock()
+        resp.status_code = response.status_code
+        resp.aiter_bytes = lambda: AsyncIterator([response.raw])
+        self.__aenter__ = MagicMock(return_value=FutureWrapper(resp))

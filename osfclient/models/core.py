@@ -22,6 +22,9 @@ class OSFCore(object):
     async def _get(self, url, *args, **kwargs):
         return await self.session.get(url, *args, **kwargs)
 
+    def _stream(self, method, url, *args, **kwargs):
+        return self.session.stream(method, url, *args, **kwargs)
+
     async def _put(self, url, *args, **kwargs):
         return await self.session.put(url, *args, **kwargs)
 
