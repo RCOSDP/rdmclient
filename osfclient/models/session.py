@@ -3,7 +3,7 @@ import httpx
 from ..exceptions import UnauthorizedException
 
 
-DEFAULT_TIMEOUT = httpx.Timeout(5.0, connect=30.0, read=None)
+DEFAULT_TIMEOUT = httpx.Timeout(30.0, read=None)
 
 class OSFSession(httpx.AsyncClient):
     auth = None
