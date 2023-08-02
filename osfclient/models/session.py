@@ -3,12 +3,14 @@ import httpx
 from ..exceptions import UnauthorizedException
 
 
+DEFAULT_TIMEOUT = httpx.Timeout(30.0, read=None)
+
 class OSFSession(httpx.AsyncClient):
     auth = None
 
-    def __init__(self):
+    def __init__(self, timeout=DEFAULT_TIMEOUT):
         """Handle HTTP session related work."""
-        super(OSFSession, self).__init__()
+        super(OSFSession, self).__init__(timeout=timeout)
         self.headers.update({
             # Only accept JSON responses
             'Accept': 'application/vnd.api+json',
@@ -46,6 +48,10 @@ class OSFSession(httpx.AsyncClient):
         if response.status_code == 401:
             raise UnauthorizedException()
         return response
+
+    def stream(self, method, url, *args, **kwargs):
+        kwargs_ = self.modify_kwargs(kwargs)
+        return super(OSFSession, self).stream(method, url, *args, **kwargs_)
 
     async def get(self, url, *args, **kwargs):
         kwargs_ = self.modify_kwargs(kwargs)

@@ -44,7 +44,7 @@ async def test_unauthorized_put(mock_put):
     with pytest.raises(UnauthorizedException):
         await session.put(url)
 
-    mock_put.assert_called_once_with(url)
+    mock_put.assert_called_once_with(url, follow_redirects=True)
 
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_unauthorized_get(mock_get):
     with pytest.raises(UnauthorizedException):
         await session.get(url)
 
-    mock_get.assert_called_once_with(url)
+    mock_get.assert_called_once_with(url, follow_redirects=True)
 
 
 @pytest.mark.asyncio
@@ -80,7 +80,7 @@ async def test_put(mock_put):
     response = await session.put(url)
 
     assert response == mock_response
-    mock_put.assert_called_once_with(url)
+    mock_put.assert_called_once_with(url, follow_redirects=True)
 
 
 @pytest.mark.asyncio
@@ -98,4 +98,4 @@ async def test_get(mock_get):
     response = await session.get(url)
 
     assert response == mock_response
-    mock_get.assert_called_once_with(url)
+    mock_get.assert_called_once_with(url, follow_redirects=True)
