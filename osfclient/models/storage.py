@@ -11,6 +11,8 @@ from ..utils import checksum
 from ..utils import file_empty
 from ..utils import get_local_file_size
 from ..utils import norm_remote_path
+from ..utils import flatten
+from ..utils import is_folder
 
 
 if six.PY2:
@@ -46,29 +48,13 @@ class Storage(OSFCore, ContainerMixin):
 
     @property
     def files(self):
-        """Iterate over all files in this storage.
-
-        Recursively lists all files in all subfolders.
-        """
-        return self._iter_children(self._files_url, 'file', File,
-                                   self._files_key)
+        """Iterate over all files in this storage."""
+        return self._iter_children(self._files_url, 'file', File)
 
     @property
     def folders(self):
-        """Iterate over all folders in this storage.
-
-        Recursively lists all folders in all subfolders.
-        """
-        return self._iter_children(self._files_url, 'folder', Folder,
-                                   self._files_key)
-
-    def matched_files(self, target_filter):
-        """Iterate all matched files in this storage.
-
-        Recursively lists files in all subfolders.
-        """
-        return self._iter_children(self._files_url, 'file', File,
-                                   self._files_key, target_filter)
+        """Iterate over all folders in this storage."""
+        return self._iter_children(self._files_url, 'folder', Folder)
 
     def create_file(self, path, fp, force=False, update=False):
         """Store a new file at `path` in this storage.
@@ -132,7 +118,9 @@ class Storage(OSFCore, ContainerMixin):
 
             else:
                 # find the upload URL for the file we are trying to update
-                for file_ in self.files:
+                for file_ in flatten(self):
+                    if is_folder(file_):
+                        continue
                     if norm_remote_path(file_.path) == path:
                         if not force:
                             if checksum(path) == file_.hashes.get('md5'):

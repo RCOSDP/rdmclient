@@ -121,10 +121,11 @@ def test_list(capsys):
         list_(args)
     captured = capsys.readouterr()
     assert captured.err == ''
-    assert captured.out.split('\n') == ['osfstorage/folder2/folder2content.txt',
+    assert captured.out.split('\n') == ['osfstorage/bye.txt',
+                                        'osfstorage/hello.txt',
+                                        'osfstorage/folder2/folder2content.txt',
                                         'osfstorage/folder1/folder1content.txt',
-                                        'osfstorage/bye.txt',
-                                        'osfstorage/hello.txt', '']
+                                        '']
 
 
 def test_sublist_exists(capsys):

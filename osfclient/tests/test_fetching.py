@@ -8,9 +8,20 @@ from mock import call, patch, mock_open
 from osfclient import OSF
 from osfclient.cli import fetch
 from osfclient.models import Storage
+from osfclient.utils import flatten
 
 from osfclient.tests.mocks import MockProject
 from osfclient.tests.mocks import MockArgs
+from osfclient.tests.mocks import is_folder_mock
+
+
+def _get_store_files(store):
+    files = []
+    for file in flatten(store):
+        if(is_folder_mock(file)):
+            continue
+        files.append(file)
+    return files
 
 
 @patch('osfclient.cli.makedirs')
@@ -23,7 +34,8 @@ def test_fetch_file(OSF_project, os_path_exists, os_makedirs):
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+            fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -48,7 +60,8 @@ def test_fetch_file_local_name_specified(OSF_project, os_path_exists,
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+            fetch(args)
 
     OSF_project.assert_called_once_with('1234')
 
@@ -58,9 +71,10 @@ def test_fetch_file_local_name_specified(OSF_project, os_path_exists,
     assert store._name_mock.return_value == 'osfstorage'
 
     expected = [call._path_mock(), call.write_to(mock_open_func())]
-    assert expected == store.files[0].mock_calls
+    files = _get_store_files(store)
+    assert expected == files[0].mock_calls
     # second file should not have been looked at
-    assert not store.files[1].mock_calls
+    assert not files[1].mock_calls
 
     # should create a file in the same directory when no local
     # filename is specified
@@ -81,7 +95,8 @@ def test_fetch_file_local_dir_specified(OSF_project, os_path_exists,
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+            fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -107,8 +122,9 @@ def test_fetch_local_file_exists(OSF_project):
             return True
 
     with patch('osfclient.cli.os.path.exists', side_effect=exists):
-        with pytest.raises(SystemExit) as e:
-            fetch(args)
+        with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+            with pytest.raises(SystemExit) as e:
+                fetch(args)
 
     assert 'already exists, not overwriting' in e.value.args[0]
 
@@ -129,7 +145,8 @@ def test_fetch_local_file_exists_force(OSF_project, os_makedirs):
 
     with patch('osfclient.cli.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
-            fetch(args)
+            with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+                fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -162,7 +179,8 @@ def test_fetch_local_file_exists_update_files_differ(OSF_project, os_makedirs):
     with patch('osfclient.cli.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
             with patch('osfclient.cli.checksum', side_effect=simple_checksum):
-                fetch(args)
+                with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+                    fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -195,7 +213,8 @@ def test_fetch_local_file_exists_update_files_match(OSF_project, os_makedirs):
     with patch('osfclient.cli.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
             with patch('osfclient.cli.checksum', side_effect=simple_checksum):
-                fetch(args)
+                with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+                    fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -229,7 +248,8 @@ def test_fetch_local_file_exists_force_overrides_update(OSF_project, os_makedirs
     with patch('osfclient.cli.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
             with patch('osfclient.cli.checksum', side_effect=simple_checksum):
-                fetch(args)
+                with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+                    fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -253,7 +273,8 @@ def test_fetch_last_file(OSF_project, os_path_exists, os_makedirs):
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+            fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -278,7 +299,8 @@ def test_fetch_file_with_base_path(OSF_project, os_path_exists, os_makedirs):
     mock_open_func = mock_open()
 
     with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
+        with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
+            fetch(args)
 
     OSF_project.assert_called_once_with('1234')
     # check that the project and the files have been accessed
@@ -292,28 +314,3 @@ def test_fetch_file_with_base_path(OSF_project, os_path_exists, os_makedirs):
         assert not f._path_mock.called
     for f in store.files[-1:]:
         assert f._path_mock.called
-
-
-@patch('osfclient.cli.makedirs')
-@patch('osfclient.cli.os.path.exists', return_value=False)
-@patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_fetch_file_with_invalid_base_path(OSF_project, os_path_exists, os_makedirs):
-    # check that `osf fetch` opens the right files with the right name and mode
-    args = MockArgs(project='1234', remote='osfstorage/b/b/b',
-                    base_path='osfstorage/a/')
-
-    mock_open_func = mock_open()
-
-    with patch('osfclient.cli.open', mock_open_func):
-        fetch(args)
-
-    OSF_project.assert_called_once_with('1234')
-    # check that the project and the files have been accessed
-    store = OSF_project.return_value.storages[0]
-    assert store._name_mock.return_value == 'osfstorage'
-
-    # should create a file in the same directory when no local
-    # filename is specified
-    assert mock.call('b', 'wb') not in mock_open_func.mock_calls
-    for f in store.files:
-        assert not f._path_mock.called

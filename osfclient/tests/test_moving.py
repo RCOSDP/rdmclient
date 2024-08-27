@@ -313,8 +313,12 @@ def test_wrong_storage_name(OSF_project):
         if key == 'OSF_PASSWORD':
             return 'secret'
 
-    with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
-        move(args)
+    with pytest.raises(SystemExit) as e:
+        with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
+            move(args)
+
+    expected = 'No files found to move.'
+    assert expected in e.value.args[0]
 
     OSF_project.assert_called_once_with('1234')
 
@@ -337,8 +341,12 @@ def test_non_existant_file(OSF_project):
         if key == 'OSF_PASSWORD':
             return 'secret'
 
-    with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
-        move(args)
+    with pytest.raises(SystemExit) as e:
+        with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
+            move(args)
+
+    expected = 'No files found to move.'
+    assert expected in e.value.args[0]
 
     OSF_project.assert_called_once_with('1234')
 

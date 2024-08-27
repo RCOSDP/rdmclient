@@ -1,5 +1,6 @@
 from mock import MagicMock, PropertyMock
-from ..utils import norm_remote_path, is_path_matched
+from ..utils import norm_remote_path
+import copy
 
 
 # When using a PropertyMock store it as an attribute
@@ -17,8 +18,12 @@ def MockFile(name):
     return mock
 
 
-def MockFolder(name):
-    mock = MagicMock(name='Folder-%s' % name, path=name)
+def MockFolder(name, files=None, folders=None):
+    mock = MagicMock(
+        name='Folder-%s' % name, 
+        path=name,
+        files=files or [],
+        folders=folders or [])
     path = PropertyMock(return_value=name)
     type(mock).path = path
     mock._path_mock = path
@@ -29,23 +34,20 @@ def MockFolder(name):
 
 
 def MockStorage(name):
-    def make_matched_files(mock):
-        def make_raw_file(file):
-            return {'attributes': {'materialized_path': '/' + norm_remote_path(file._path_mock.return_value)}}
-        def matched_files(target_filter):
-            return [f for f in mock.files if target_filter(make_raw_file(f))]
-        return matched_files
-
+    a_a_files = [MockFile('/a/a/a')]
+    b_b_files = [MockFile('/b/b/b')]
+    a_folders = [MockFolder('/a/a',files=a_a_files)]
+    b_folders = [MockFolder('/b/b',files=b_b_files)]
+    c_folders = [MockFolder('/c/c')]
+    folders = [
+        MockFolder('/a',folders=a_folders),
+        MockFolder('/b',folders=b_folders),
+        MockFolder('/c',folders=c_folders)]
     mock = MagicMock(name='Storage-%s' % name,
-                     files=[MockFile('/a/a/a'), MockFile('b/b/b')],
-                     folders=[MockFolder('/a'), MockFolder('/a/a'),
-                              MockFolder('/c'), MockFolder('/c/c')])
+                     folders=folders)
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name
-    matched_files = MagicMock(side_effect=make_matched_files(mock))
-    type(mock).matched_files = matched_files
-    mock._matched_files_mock = matched_files
     return mock
 
 
@@ -115,4 +117,7 @@ class FakeResponse:
         self._json = json
 
     def json(self):
-        return self._json
+        return copy.deepcopy(self._json)
+    
+def is_folder_mock(file_or_folder):
+    return file_or_folder._mock_name.startswith('Folder-')

@@ -67,13 +67,13 @@ def test_iterate_folders(OSFCore_get):
 
     folders = list(store.folders)
 
-    assert len(folders) == 3
+    assert len(folders) == 2
     for folder in folders:
         assert isinstance(folder, Folder)
         assert folder.session == store.session
-        assert folder.name in ('foo', 'bar', 'childfoo')
+        assert folder.name in ('foo', 'bar')
 
-    assert len(set(called)) == 4
+    assert len(set(called)) == 1
 
 
 def test_iterate_files_and_folders():
@@ -103,13 +103,13 @@ def test_iterate_files_and_folders():
                       side_effect=simple_OSFCore_get) as mock_osf_get:
         files = list(store.files)
 
-    assert len(files) == 4
+    assert len(files) == 2
     for file_ in files:
         assert isinstance(file_, File)
         assert file_.session == store.session
 
     # check right URLs are called in the right order
-    expected = [((store._files_url,),), ((second_level_url,),)]
+    expected = [((store._files_url,),)]
     assert mock_osf_get.call_args_list == expected
 
 

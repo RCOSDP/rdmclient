@@ -4,7 +4,6 @@ from osfclient.utils import file_empty
 from osfclient.utils import norm_remote_path
 from osfclient.utils import makedirs
 from osfclient.utils import split_storage
-from osfclient.utils import is_path_matched
 
 
 def test_default_storage():
@@ -179,27 +178,3 @@ def test_empty_file_py2():
     assert expected == fake_fp.mock_calls
     # mocks and calls on mocks always return True, so this should be False
     assert not empty
-
-
-def test_is_path_matched():
-    assert is_path_matched(None, {'attributes': {'materialized_path': 'p1/'}})
-    assert is_path_matched('p1/',
-                           {'attributes': {'materialized_path': 'p1/'}})
-    assert not is_path_matched('p1/',
-                               {'attributes': {'materialized_path': 'p2/'}})
-    assert is_path_matched('p1/p2/',
-                           {'attributes': {'materialized_path': 'p1/p2/'}})
-    assert is_path_matched('p1/',
-                           {'attributes': {'materialized_path': 'p1/p2/'}})
-    assert is_path_matched('p1/p2/',
-                           {'attributes': {'materialized_path': 'p1/'}})
-    assert not is_path_matched('p1/p2/',
-                               {'attributes': {'materialized_path': 'p1/-p2/'}})
-    assert is_path_matched('p1/%p2/',
-                           {'attributes': {'materialized_path': 'p1/-p2/'}})
-    assert not is_path_matched('p1/%p2/',
-                               {'attributes': {'materialized_path': 'p1/-p2-/'}})
-    assert is_path_matched('p1/%p2%/',
-                               {'attributes': {'materialized_path': 'p1/-p2-/'}})
-    assert is_path_matched('p1/%p2/',
-                           {'attributes': {'materialized_path': 'p1/-p2/p3/'}})
