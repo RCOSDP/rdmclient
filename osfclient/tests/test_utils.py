@@ -4,6 +4,7 @@ from osfclient.utils import file_empty
 from osfclient.utils import norm_remote_path
 from osfclient.utils import makedirs
 from osfclient.utils import split_storage
+from osfclient.tests.mocks import MockStream
 
 
 def test_default_storage():
@@ -158,23 +159,11 @@ def test_makedirs_py3(mock_makedirs):
     assert expected == mock_makedirs.mock_calls
 
 
-def test_empty_file():
-    fake_fp = Mock()
-    with patch('osfclient.utils.six.PY2', False):
-        empty = file_empty(fake_fp)
+async def test_empty_file():
+    fake_fp = MockStream('foobar.txt', 'rb', size=1024)
+    empty = await file_empty(fake_fp)
 
-    expected = [call.peek()]
-    assert expected == fake_fp.mock_calls
-    # mocks and calls on mocks always return True, so this should be False
-    assert not empty
-
-
-def test_empty_file_py2():
-    fake_fp = Mock()
-    with patch('osfclient.utils.six.PY2', True):
-        empty = file_empty(fake_fp)
-
-    expected = [call.read(), call.seek(0)]
+    expected = [call.seek(0, 2), call.tell(), call.seek(0)]
     assert expected == fake_fp.mock_calls
     # mocks and calls on mocks always return True, so this should be False
     assert not empty

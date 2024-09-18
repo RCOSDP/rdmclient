@@ -10,9 +10,9 @@ from osfclient.cli import fetch
 from osfclient.models import Storage
 from osfclient.utils import find_by_path
 
-from osfclient.tests.mocks import MockProject
-from osfclient.tests.mocks import MockArgs
-from osfclient.tests.mocks import is_folder_mock
+from osfclient.tests.mocks import (
+    MockProject, MockArgs, is_folder_mock, mock_async_open, MockStream,
+)
 
 
 async def _pick_element_by_index(iterable, index):
@@ -31,9 +31,9 @@ async def test_fetch_file(OSF_project, os_path_exists, os_makedirs):
     # check that `osf fetch` opens the right files with the right name and mode
     args = MockArgs(project='1234', remote='osfstorage/a/a/a')
 
-    mock_open_func = mock_open()
+    mock_open_func = mock_async_open()
 
-    with patch('osfclient.cli.open', mock_open_func):
+    with patch('osfclient.cli.aiofiles.open', mock_open_func):
         with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
             await fetch(args)
 
@@ -58,9 +58,10 @@ async def test_fetch_file_local_name_specified(OSF_project, os_path_exists,
     args = MockArgs(project='1234', remote='osfstorage/a/a/a',
                     local='foobar.txt')
 
-    mock_open_func = mock_open()
+    mock_stream = MockStream('foobar.txt', 'wb')
+    mock_open_func = mock_async_open(stream=mock_stream)
 
-    with patch('osfclient.cli.open', mock_open_func):
+    with patch('osfclient.cli.aiofiles.open', mock_open_func):
         with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
             await fetch(args)
 
@@ -71,7 +72,7 @@ async def test_fetch_file_local_name_specified(OSF_project, os_path_exists,
     store = await project._storage_mock.return_value
     assert store._name_mock.return_value == 'osfstorage'
 
-    expected = [call._path_mock(), call.write_to(mock_open_func()), call._path_mock()]
+    expected = [call._path_mock(), call.write_to(mock_stream), call._path_mock()]
     file = await find_by_path(store, 'a/a/a')
     assert expected == file.mock_calls
     # second file should not have been looked at
@@ -95,9 +96,9 @@ async def test_fetch_file_local_dir_specified(OSF_project, os_path_exists,
     args = MockArgs(project='1234', remote='osfstorage/a/a/a',
                     local='subdir/foobar.txt')
 
-    mock_open_func = mock_open()
+    mock_open_func = mock_async_open()
 
-    with patch('osfclient.cli.open', mock_open_func):
+    with patch('osfclient.cli.aiofiles.open', mock_open_func):
         with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
             await fetch(args)
 
@@ -146,9 +147,9 @@ async def test_fetch_local_file_exists_force(OSF_project, os_makedirs):
         else:
             return True
 
-    mock_open_func = mock_open()
+    mock_open_func = mock_async_open()
 
-    with patch('osfclient.cli.open', mock_open_func):
+    with patch('osfclient.cli.aiofiles.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
             with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
                 await fetch(args)
@@ -177,14 +178,14 @@ async def test_fetch_local_file_exists_update_files_differ(OSF_project, os_maked
         else:
             return True
 
-    def simple_checksum(file_path):
+    async def simple_checksum_path(file_path):
         return '1' * 32
 
-    mock_open_func = mock_open()
+    mock_open_func = mock_async_open()
 
-    with patch('osfclient.cli.open', mock_open_func):
+    with patch('osfclient.cli.aiofiles.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
-            with patch('osfclient.cli.checksum', side_effect=simple_checksum):
+            with patch('osfclient.cli.checksum_path', side_effect=simple_checksum_path):
                 with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
                     await fetch(args)
 
@@ -212,14 +213,14 @@ async def test_fetch_local_file_exists_update_files_match(OSF_project, os_makedi
         else:
             return True
 
-    def simple_checksum(file_path):
+    async def simple_checksum_path(file_path):
         return '0' * 32
 
-    mock_open_func = mock_open()
+    mock_open_func = mock_async_open()
 
-    with patch('osfclient.cli.open', mock_open_func):
+    with patch('osfclient.cli.aiofiles.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
-            with patch('osfclient.cli.checksum', side_effect=simple_checksum):
+            with patch('osfclient.cli.checksum_path', side_effect=simple_checksum_path):
                 with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
                     await fetch(args)
 
@@ -248,14 +249,14 @@ async def test_fetch_local_file_exists_force_overrides_update(OSF_project, os_ma
         else:
             return True
 
-    def simple_checksum(file_path):
+    async def simple_checksum_path(file_path):
         return '0' * 32
 
-    mock_open_func = mock_open()
+    mock_open_func = mock_async_open()
 
-    with patch('osfclient.cli.open', mock_open_func):
+    with patch('osfclient.cli.aiofiles.open', mock_open_func):
         with patch('osfclient.cli.os.path.exists', side_effect=exists):
-            with patch('osfclient.cli.checksum', side_effect=simple_checksum):
+            with patch('osfclient.cli.checksum_path', side_effect=simple_checksum_path):
                 with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
                     await fetch(args)
 
@@ -279,9 +280,9 @@ async def test_fetch_last_file(OSF_project, os_path_exists, os_makedirs):
     # check that `osf fetch` opens the right files with the right name and mode
     args = MockArgs(project='1234', remote='osfstorage/b/b/b')
 
-    mock_open_func = mock_open()
+    mock_open_func = mock_async_open()
 
-    with patch('osfclient.cli.open', mock_open_func):
+    with patch('osfclient.cli.aiofiles.open', mock_open_func):
         with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
             await fetch(args)
 
@@ -306,9 +307,9 @@ async def test_fetch_file_with_base_path(OSF_project, os_path_exists, os_makedir
     args = MockArgs(project='1234', remote='osfstorage/b/b/b',
                     base_path='osfstorage/b/b/')
 
-    mock_open_func = mock_open()
+    mock_open_func = mock_async_open()
 
-    with patch('osfclient.cli.open', mock_open_func):
+    with patch('osfclient.cli.aiofiles.open', mock_open_func):
         with patch('osfclient.cli.is_folder', side_effect=is_folder_mock):
             await fetch(args)
 

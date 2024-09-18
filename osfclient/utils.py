@@ -6,11 +6,13 @@ Helpers and other assorted functions.
 import hashlib
 import os
 import six
+import aiofiles
+
 
 KNOWN_PROVIDERS = ['osfstorage', 'github', 'figshare', 'googledrive']
 
 
-def norm_remote_path(path):
+def norm_remote_path(path: str) -> str:
     """Normalize `path`.
 
     All remote paths are absolute.
@@ -58,22 +60,32 @@ def makedirs(path, mode=511, exist_ok=False):
             return os.makedirs(path, mode)
 
 
-def file_empty(fp):
+async def file_empty(fp):
     """Determine if a file is empty or not."""
-    if not hasattr(fp, 'peek'):
-        # If a Reader does not support peek, it is not considered empty
+    if not hasattr(fp, 'seek'):
+        # If a Reader does not support seek, it is not considered empty
         return False
-    # for python 2 we need to use a homemade peek()
-    if six.PY2:
-        contents = fp.read()
-        fp.seek(0)
-        return not bool(contents)
-    else:
-        return not fp.peek()
+    await fp.seek(0, os.SEEK_END)
+    pos = await fp.tell()
+    await fp.seek(0)
+    return pos == 0
 
 
-def checksum(file_path, hash_type='md5', block_size=65536):
+async def checksum_path(file_path, hash_type='md5', block_size=65536):
     """Returns either the md5 or sha256 hash of a file at `file_path`.
+
+    md5 is the default hash_type as it is faster than sha256
+
+    The default block size is 64 kb, which appears to be one of a few command
+    choices according to https://stackoverflow.com/a/44873382/2680. The code
+    below is an extension of the example presented in that post.
+    """
+    async with aiofiles.open(file_path, 'rb') as f:
+        return await checksum_fp(f, hash_type, block_size)
+
+
+async def checksum_fp(fp, hash_type='md5', block_size=65536):
+    """Returns either the md5 or sha256 hash of a file indicated by file pointer `fp`.
 
     md5 is the default hash_type as it is faster than sha256
 
@@ -91,9 +103,9 @@ def checksum(file_path, hash_type='md5', block_size=65536):
             .format(hash_type)
         )
 
-    with open(file_path, 'rb') as f:
-        for block in iter(lambda: f.read(block_size), b''):
-            hash_.update(block)
+    await fp.seek(0)
+    async for block in fp:
+        hash_.update(block)
     return hash_.hexdigest()
 
 

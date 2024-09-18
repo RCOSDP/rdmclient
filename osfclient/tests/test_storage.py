@@ -12,7 +12,7 @@ from osfclient.models import File
 from osfclient.models import Folder
 
 from osfclient.tests import fake_responses
-from osfclient.tests.mocks import FakeResponse, FutureFakeResponse, MockFile
+from osfclient.tests.mocks import FakeResponse, FutureFakeResponse, MockStream
 
 
 @pytest.mark.asyncio
@@ -136,13 +136,12 @@ async def test_create_existing_file():
     except NameError:
         exception = OSError
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
     with pytest.raises(exception):
         await store.create_file('foo.txt', fake_fp)
 
     store._put.assert_called_once_with(new_file_url,
-                                       data=fake_fp,
+                                       content=fake_fp,
                                        params={'name': 'foo.txt'})
 
     assert fake_fp.call_count == 0
@@ -156,7 +155,7 @@ async def test_force_existing_file():
     store = Storage({})
     store._new_file_url = new_file_url
 
-    def simple_OSFCore_put(url, params=None, data=None):
+    def simple_OSFCore_put(url, params=None, content=None):
         if url == new_file_url:
             return FakeResponse(409, None)
         elif url.endswith("osfstorage/foo.txt"):
@@ -171,8 +170,7 @@ async def test_force_existing_file():
         if url == store._files_url:
             return top_level_response
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
     with patch.object(OSFCore, '_put',
                       side_effect=simple_OSFCore_put) as fake_put:
         with patch.object(OSFCore, '_get',
@@ -180,7 +178,7 @@ async def test_force_existing_file():
             await store.create_file('foo.txt', fake_fp, force=True)
 
     assert fake_fp.call_count == 0
-    assert call.peek(1) in fake_fp.mock_calls
+    assert call.seek(0, 2) in fake_fp.mock_calls
     # should have made two PUT requests, first attempt at uploading then
     # to update the file
     assert fake_put.call_count == 2
@@ -197,7 +195,7 @@ async def test_update_existing_file_files_differ():
     store = Storage({})
     store._new_file_url = new_file_url
 
-    def simple_OSFCore_put(url, params=None, data=None):
+    def simple_OSFCore_put(url, params=None, content=None):
         if url == new_file_url:
             return FakeResponse(409, None)
         elif url.endswith("osfstorage/foo.txt"):
@@ -214,21 +212,21 @@ async def test_update_existing_file_files_differ():
         if url == store._files_url:
             return top_level_response
 
-    def simple_checksum(file_path):
+    async def simple_checksum_fp(fp):
         return '0' * 32
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
     with patch.object(OSFCore, '_put',
                       side_effect=simple_OSFCore_put) as fake_put:
         with patch.object(OSFCore, '_get',
                           side_effect=simple_OSFCore_get) as fake_get:
-            with patch('osfclient.models.storage.checksum',
-                       side_effect=simple_checksum):
+            with patch('osfclient.models.storage.checksum_fp',
+                       side_effect=simple_checksum_fp):
                 await store.create_file('foo.txt', fake_fp, update=True)
 
     assert fake_fp.call_count == 0
-    assert call.peek(1) in fake_fp.mock_calls
+    assert call.seek(0, 2) in fake_fp.mock_calls
+    assert call.tell() in fake_fp.mock_calls
     # should have made two PUT requests, first attempt at uploading then
     # to update the file
     assert fake_put.call_count == 2
@@ -245,7 +243,7 @@ async def test_update_existing_file_files_match():
     store = Storage({})
     store._new_file_url = new_file_url
 
-    def simple_OSFCore_put(url, params=None, data=None):
+    def simple_OSFCore_put(url, params=None, content=None):
         if url == new_file_url:
             return FakeResponse(409, None)
         elif url.endswith("osfstorage/foo.txt"):
@@ -262,23 +260,22 @@ async def test_update_existing_file_files_match():
         if url == store._files_url:
             return top_level_response
 
-    def simple_checksum(file_path):
+    async def simple_checksum_fp(fp):
         return '0' * 32
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
     with patch.object(OSFCore, '_put',
                       side_effect=simple_OSFCore_put) as fake_put:
         with patch.object(OSFCore, '_get',
                           side_effect=simple_OSFCore_get) as fake_get:
-            with patch('osfclient.models.storage.checksum',
-                       side_effect=simple_checksum):
+            with patch('osfclient.models.storage.checksum_fp',
+                       side_effect=simple_checksum_fp):
                 await store.create_file('foo.txt', fake_fp, update=True)
 
     assert fake_fp.call_count == 0
-    assert call.peek(1) not in fake_fp.mock_calls
     # should have made one PUT requests, first attempt at uploading, and no
     # attempt to update the file since they match
+    print(fake_put.mock_calls)
     assert fake_put.call_count == 1
     # should have made one GET request to list files
     assert fake_get.call_count == 1
@@ -293,7 +290,7 @@ async def test_update_existing_file_files_match_force_overrides_update():
     store = Storage({})
     store._new_file_url = new_file_url
 
-    def simple_OSFCore_put(url, params=None, data=None):
+    def simple_OSFCore_put(url, params=None, content=None):
         if url == new_file_url:
             return FakeResponse(409, None)
         elif url.endswith("osfstorage/foo.txt"):
@@ -310,21 +307,21 @@ async def test_update_existing_file_files_match_force_overrides_update():
         if url == store._files_url:
             return top_level_response
 
-    def simple_checksum(file_path):
+    async def simple_checksum_fp(fp):
         return '0' * 32
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
     with patch.object(OSFCore, '_put',
                       side_effect=simple_OSFCore_put) as fake_put:
         with patch.object(OSFCore, '_get',
                           side_effect=simple_OSFCore_get) as fake_get:
-            with patch('osfclient.models.storage.checksum',
-                       side_effect=simple_checksum):
+            with patch('osfclient.models.storage.checksum_fp',
+                       side_effect=simple_checksum_fp):
                 await store.create_file('foo.txt', fake_fp, force=True, update=True)
 
     assert fake_fp.call_count == 0
-    assert call.peek(1) in fake_fp.mock_calls
+    assert call.seek(0, 2) in fake_fp.mock_calls
+    assert call.tell() in fake_fp.mock_calls
     # should have made two PUT requests, first attempt at uploading then
     # to update the file, even though they match, since force=True overrides
     # update=True
@@ -342,7 +339,7 @@ async def test_update_existing_file_fails():
     store = Storage({})
     store._new_file_url = new_file_url
 
-    def simple_OSFCore_put(url, params=None, data=None):
+    def simple_OSFCore_put(url, params=None, content=None):
         if url == new_file_url:
             return FakeResponse(409, None)
         elif url.endswith("osfstorage/foo.txt"):
@@ -360,8 +357,7 @@ async def test_update_existing_file_fails():
         if url == store._files_url:
             return top_level_response
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
     with patch.object(OSFCore, '_put',
                       side_effect=simple_OSFCore_put):
         with patch.object(OSFCore, '_get',
@@ -379,13 +375,12 @@ async def test_create_new_file():
     store._new_file_url = new_file_url
     store._put = MagicMock(return_value=FutureFakeResponse(201, None))
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
 
     await store.create_file('foo.txt', fake_fp)
 
     store._put.assert_called_once_with(new_file_url,
-                                       data=fake_fp,
+                                       content=fake_fp,
                                        params={'name': 'foo.txt'})
 
     assert fake_fp.call_count == 0
@@ -402,7 +397,7 @@ async def test_create_new_file_subdirectory():
     store._new_file_url = new_file_url
     store._new_folder_url = new_folder_url
 
-    def simple_put(url, params={}, data=None):
+    def simple_put(url, params={}, content=None):
         if url == new_folder_url:
             # this is a full fledged Folder response but also works as a
             # fake for _WaterButlerFolder
@@ -416,14 +411,13 @@ async def test_create_new_file_subdirectory():
             print(url)
             assert False, 'Whoops!'
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
 
     with patch.object(Storage, '_put', side_effect=simple_put) as mock_put:
         await store.create_file('bar/foo.txt', fake_fp)
 
     expected = [call(new_folder_url, params={'name': 'bar'}),
-                call(new_file_url, params={'name': 'foo.txt'}, data=fake_fp)]
+                call(new_file_url, params={'name': 'foo.txt'}, content=fake_fp)]
     assert mock_put.call_args_list == expected
     assert fake_fp.call_count == 0
 
@@ -437,19 +431,14 @@ async def test_create_new_zero_length_file():
     store._new_file_url = new_file_url
     store._put = MagicMock(return_value=FutureFakeResponse(201, None))
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
-    if six.PY3:
-        fake_fp.peek = lambda: ''
-    if six.PY2:
-        fake_fp.read = lambda: ''
+    fake_fp = MockStream('foo.txt', 'rb', size=0)
 
     await store.create_file('foo.txt', fake_fp)
 
     store._put.assert_called_once_with(new_file_url,
                                        # this is the important check in
                                        # this test
-                                       data=b'',
+                                       content=b'',
                                        params={'name': 'foo.txt'})
 
     assert fake_fp.call_count == 0
@@ -470,8 +459,7 @@ async def test_create_small_file_connection_error():
     except NameError:
         exception = OSError
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
     # set file size of 1 MB minus 1 byte ("small" file)
     with patch('osfclient.models.storage.get_local_file_size',
                return_value=2**20-1):
@@ -479,7 +467,7 @@ async def test_create_small_file_connection_error():
             await store.create_file('foo.txt', fake_fp)
 
     store._put.assert_called_once_with(new_file_url,
-                                       data=fake_fp,
+                                       content=fake_fp,
                                        params={'name': 'foo.txt'})
 
     assert fake_fp.call_count == 0
@@ -500,8 +488,7 @@ async def test_create_big_file_connection_error(monkeypatch):
     except NameError:
         exception = OSError
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
     # set file size of 1 MB ("big" file)
     with patch('osfclient.models.storage.get_local_file_size',
                return_value=2**20):
@@ -509,7 +496,7 @@ async def test_create_big_file_connection_error(monkeypatch):
             await store.create_file('foo.txt', fake_fp)
 
     store._put.assert_called_once_with(new_file_url,
-                                       data=fake_fp,
+                                       content=fake_fp,
                                        params={'name': 'foo.txt'})
 
     assert fake_fp.call_count == 0
@@ -523,13 +510,13 @@ async def test_update_existing_file_overrides_connection_error():
     store = Storage({})
     store._new_file_url = new_file_url
 
-    def simple_OSFCore_put(url, params=None, data=None):
+    def simple_OSFCore_put(url, params=None, content=None):
         if url == new_file_url:
             raise ConnectionError
         elif url.endswith("osfstorage/foo.txt"):
             return FakeResponse(200, None)
 
-    def simple_checksum(file_path):
+    async def simple_checksum_fp(fp):
         return '0' * 32
 
     store._files_url = 'https://api.osf.io/v2/nodes/f3szh/files/osfstorage'
@@ -541,18 +528,18 @@ async def test_update_existing_file_overrides_connection_error():
         if url == store._files_url:
             return top_level_response
 
-    fake_fp = MagicMock()
-    fake_fp.mode = 'rb'
+    fake_fp = MockStream('foo.txt', 'rb')
     with patch.object(OSFCore, '_put',
                       side_effect=simple_OSFCore_put) as fake_put:
         with patch.object(OSFCore, '_get',
                           side_effect=simple_OSFCore_get) as fake_get:
-            with patch('osfclient.models.storage.checksum',
-                       side_effect=simple_checksum):
+            with patch('osfclient.models.storage.checksum_fp',
+                       side_effect=simple_checksum_fp):
                 await store.create_file('foo.txt', fake_fp, update=True)
 
     assert fake_fp.call_count == 0
-    assert call.peek(1) in fake_fp.mock_calls
+    assert call.seek(0, 2) in fake_fp.mock_calls
+    assert call.tell() in fake_fp.mock_calls
     # should have made two PUT requests, first attempt at uploading then
     # to update the file
     assert fake_put.call_count == 2

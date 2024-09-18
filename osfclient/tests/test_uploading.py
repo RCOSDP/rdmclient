@@ -12,6 +12,7 @@ from osfclient.cli import upload
 
 from osfclient.tests.mocks import MockArgs
 from osfclient.tests.mocks import MockProject
+from osfclient.tests.mocks import mock_async_open, MockStream
 
 
 @pytest.mark.asyncio
@@ -42,9 +43,10 @@ async def test_select_project(OSF_project):
             return 'secret'
         return default
 
-    fake_open = mock_open()
+    fake_stream = MockStream('foo/bar.txt', 'rb')
+    fake_open = mock_async_open(fake_stream)
 
-    with patch('osfclient.cli.open', fake_open):
+    with patch('osfclient.cli.aiofiles.open', fake_open):
         with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
             await upload(args)
 
@@ -56,7 +58,7 @@ async def test_select_project(OSF_project):
     assert fake_project._storage_mock.mock_calls == expected
     # assert fake_project.mock_calls == expected
 
-    expected = [call.create_file('bar/bar/foo.txt', fake_open.return_value,
+    expected = [call.create_file('bar/bar/foo.txt', fake_stream,
                                  force=False, update=False)]
     # we should call the create_file method on the return
     # value of _storage_mock
@@ -103,7 +105,7 @@ async def test_recursive_upload(OSF_project):
             return 'secret'
         return default
 
-    fake_open = mock_open()
+    fake_open = mock_async_open()
     fake_storage = await OSF_project.return_value.storage.return_value
 
     # it is important we use foobar/ and not foobar to match with args.source
@@ -112,7 +114,7 @@ async def test_recursive_upload(OSF_project):
                     ('foobar/baz', None, ['bar.txt', 'abc.txt'])
                     ]
 
-    with patch('osfclient.cli.open', fake_open):
+    with patch('osfclient.cli.aiofiles.open', fake_open):
         with patch('os.walk', return_value=iter(dir_contents)):
             with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
                 with patch('osfclient.cli.os.path.isdir', return_value=True):
@@ -122,9 +124,8 @@ async def test_recursive_upload(OSF_project):
     assert call('foobar/abc.txt', 'rb') in fake_open.mock_calls
     assert call('foobar/baz/bar.txt', 'rb') in fake_open.mock_calls
     assert call('foobar/baz/abc.txt', 'rb') in fake_open.mock_calls
-    # two directories with two files each -> four calls plus all the
-    # context manager __enter__ and __exit__ calls
-    assert len(fake_open.mock_calls) == 4 + 4*2
+    # two directories with two files each -> four calls
+    assert len(fake_open.mock_calls) == 4
 
     fake_storage.assert_has_calls([
         call.create_file('BAR/./bar.txt', mock.ANY, force=False, update=False),
@@ -152,7 +153,7 @@ async def test_recursive_upload_with_subdir(OSF_project):
             return 'secret'
         return default
 
-    fake_open = mock_open()
+    fake_open = mock_async_open()
     fake_storage = await OSF_project.return_value.storage.return_value
 
     # it is important we use foobar and not foobar/ to match with args.source
@@ -161,7 +162,7 @@ async def test_recursive_upload_with_subdir(OSF_project):
                     ('foobar/baz', None, ['bar.txt', 'abc.txt'])
                     ]
 
-    with patch('osfclient.cli.open', fake_open):
+    with patch('osfclient.cli.aiofiles.open', fake_open):
         with patch('os.walk', return_value=iter(dir_contents)):
             with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
                 with patch('osfclient.cli.os.path.isdir', return_value=True):
@@ -171,9 +172,8 @@ async def test_recursive_upload_with_subdir(OSF_project):
     assert call('foobar/abc.txt', 'rb') in fake_open.mock_calls
     assert call('foobar/baz/bar.txt', 'rb') in fake_open.mock_calls
     assert call('foobar/baz/abc.txt', 'rb') in fake_open.mock_calls
-    # two directories with two files each -> four calls plus all the
-    # context manager __enter__ and __exit__ calls
-    assert len(fake_open.mock_calls) == 4 + 4*2
+    # two directories with two files each -> four calls
+    assert len(fake_open.mock_calls) == 4
 
     fake_storage.assert_has_calls([
         call.create_file('BAR/foobar/./bar.txt', mock.ANY,

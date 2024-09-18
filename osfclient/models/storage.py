@@ -1,3 +1,5 @@
+from functools import partial
+import logging
 import os
 import six
 
@@ -7,13 +9,17 @@ from .core import OSFCore
 from .file import ContainerMixin
 from .file import File
 from .file import Folder
-from ..utils import checksum
 from ..utils import file_empty
 from ..utils import get_local_file_size
 from ..utils import norm_remote_path
-from ..utils import flatten
 from ..utils import find_by_path
 from ..utils import is_folder
+from ..utils import checksum_fp
+from ..utils import norm_remote_path
+from ..utils import find_by_path
+
+
+logger = logging.getLogger(__name__)
 
 
 if six.PY2:
@@ -67,7 +73,6 @@ class Storage(OSFCore, ContainerMixin):
         To force overwrite of an existing file, set `force=True`.
         To overwrite an existing file only if the files differ, set `update=True`
         """
-        from ..utils import find_by_path
         if hasattr(fp, 'mode') and 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
@@ -93,13 +98,17 @@ class Storage(OSFCore, ContainerMixin):
         # handling in requests. If we pass a file like object to data that
         # turns out to be of length zero then no file is created on the OSF.
         # See: https://github.com/osfclient/osfclient/pull/135
-        if file_empty(fp):
-            response = await self._put(url, params={'name': fname}, data=b'')
+        if await file_empty(fp):
+            logger.info("File is empty, uploading zero-length bytes.")
+            response = await self._put(url, params={'name': fname}, content=b'')
+
         else:
+            logger.info("Uploading file: %s", path)
             try:
-                response = await self._put(url, params={'name': fname}, data=fp)
+                response = await self._put(url, params={'name': fname}, content=fp)
             except ConnectionError:
                 connection_error = True
+                logger.info("Connection error while uploading file: %s", path)
 
         if connection_error or response.status_code == 409:
             if not force and not update:
@@ -127,12 +136,15 @@ class Storage(OSFCore, ContainerMixin):
                 if is_folder(file_):
                     raise RuntimeError("Cannot update a folder.")
                 if not force:
-                    if checksum(path) == file_.hashes.get('md5'):
+                    if await checksum_fp(fp) == file_.hashes.get('md5'):
                         # If the hashes are equal and force is False,
                         # we're done here
+                        logger.info("File already exists and hashes match, "
+                                    "skipping upload. local: %s, remote: %s" %
+                                    (await checksum_fp(fp), file_.hashes.get('md5')))
                         return
                 # in the process of attempting to upload the file we
                 # moved through it -> reset read position to beginning
                 # of the file
-                fp.seek(0)
+                await fp.seek(0)
                 await file_.update(fp)

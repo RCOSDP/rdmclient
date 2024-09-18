@@ -1,8 +1,16 @@
 import io
+import logging
 from tqdm import tqdm
+from typing import AsyncGenerator, Dict, Type, TypeVar
 
 from .core import OSFCore
 from ..exceptions import FolderExistsException, UnauthorizedException
+from ..utils import file_empty
+
+
+logger = logging.getLogger(__name__)
+OSFCoreType = TypeVar('OSFCoreType', bound=OSFCore)
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 class tqdm_indeterminate(tqdm):
@@ -20,7 +28,7 @@ class tqdm_indeterminate(tqdm):
         return d
 
 
-def copyfileobj(fsrc, fdst, total, length=16*1024):
+async def copyfileobj(fsrc, fdst, total, length=16*1024):
     """Copy data from file-like object fsrc to file-like object fdst
 
     This is like shutil.copyfileobj but with a progressbar.
@@ -30,11 +38,8 @@ def copyfileobj(fsrc, fdst, total, length=16*1024):
           if total is not None else
           tqdm_indeterminate(unit='bytes', unit_scale=True,
                              bar_format=format_ind_loop)) as pbar:
-        while 1:
-            buf = fsrc.read(length)
-            if not buf:
-                break
-            fdst.write(buf)
+        async for buf in fsrc:
+            await fdst.write(buf)
             pbar.update(len(buf))
 
 
@@ -86,8 +91,8 @@ class File(OSFCore):
                 raise UnauthorizedException()
             if response.status_code == 200:
                 async for data in response.aiter_bytes():
-                    fp.write(data)
-                fp.flush()
+                    await fp.write(data)
+                await fp.flush()
             else:
                 raise RuntimeError("Response has status "
                                 "code {}.".format(response.status_code))
@@ -111,10 +116,12 @@ class File(OSFCore):
         # peek at the file to check if it is an ampty file which needs special
         # handling in requests. If we pass a file like object to data that
         # turns out to be of length zero then no file is created on the OSF
-        if not hasattr(fp, 'peek') or fp.peek(1):
-            response = await self._put(url, data=fp)
+        if not await file_empty(fp):
+            logger.info("Uploading file: %s", self.path)
+            response = await self._put(url, content=fp)
         else:
-            response = await self._put(url, data=b'')
+            logger.info("File is empty, uploading zero-length bytes.")
+            response = await self._put(url, content=b'')
 
         if response.status_code != 200:
             msg = ('Could not update {} (status '
@@ -140,8 +147,9 @@ class File(OSFCore):
 
 
 class ContainerMixin:
-    async def _iter_children(self, url, kind, klass, recurse=None,
-                       target_filter=None):
+    async def _iter_children(
+        self, url: str, kind, klass: Type[OSFCoreType], recurse=None, target_filter=None
+    ) -> AsyncGenerator[OSFCoreType, None]:
         """Iterate over all children of `kind`
 
         Yield an instance of `klass` when a child is of type `kind`. Uses
