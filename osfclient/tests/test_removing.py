@@ -23,17 +23,17 @@ async def test_anonymous_doesnt_work():
                    side_effect=simple_getenv) as mock_getenv:
             await remove(args)
 
-    expected = 'remove a file you need to provide a username and password'
+    expected = 'remove a file you need to provide a token'
     assert expected in e.value.args[0]
 
 
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_remove_file(OSF_project):
-    args = MockArgs(project='1234', username='joe', target='osfstorage/a/a/a')
+    args = MockArgs(project='1234', target='osfstorage/a/a/a')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -54,10 +54,10 @@ async def test_remove_file(OSF_project):
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_wrong_storage_name(OSF_project):
-    args = MockArgs(project='1234', username='joe', target='DOESNTEXIST/a/a/a')
+    args = MockArgs(project='1234', target='DOESNTEXIST/a/a/a')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -83,11 +83,11 @@ async def test_wrong_storage_name(OSF_project):
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_non_existant_file(OSF_project):
-    args = MockArgs(project='1234', username='joe',
+    args = MockArgs(project='1234',
                     target='osfstorage/DOESNTEXIST/a')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -114,10 +114,10 @@ async def test_non_existant_file(OSF_project):
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_remove_folder(OSF_project):
-    args = MockArgs(project='1234', username='joe', target='osfstorage/a/a')
+    args = MockArgs(project='1234', target='osfstorage/a/a')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -140,10 +140,10 @@ async def test_remove_folder(OSF_project):
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_remove_folder_with_slash(OSF_project):
-    args = MockArgs(project='1234', username='joe', target='osfstorage/a/a/')
+    args = MockArgs(project='1234', target='osfstorage/a/a/')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 

@@ -3,23 +3,32 @@ from .storage import Storage
 
 
 class Project(OSFCore):
-    _types = [
-        'nodes',
-        'registrations'
-    ]
-
     def _update_attributes(self, project):
+        """Update attributes from JSON response.
+
+        For the purpose of speeding up the process, project information is not obtained.
+        The following data is received as dummy data.
+
+        {
+            'data': {
+                'id': 'xxxxx',
+                'reltionships': {
+                    'files': {
+                        'links': {
+                            'related': {
+                                'href': 'https://api.osf.io/v2/nodes/xxxxx/files/'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
         if not project:
             return
 
         project = project['data']
-        self._endpoint = self._get_attribute(project, 'links', 'self')
         self.id = self._get_attribute(project, 'id')
-        attrs = self._get_attribute(project, 'attributes')
-        self.title = self._get_attribute(attrs, 'title')
-        self.date_created = self._get_attribute(attrs, 'date_created')
-        self.date_modified = self._get_attribute(attrs, 'date_modified')
-        self.description = self._get_attribute(attrs, 'description')
 
         storages = ['relationships', 'files', 'links', 'related', 'href']
         self._storages_url = self._get_attribute(project, *storages)

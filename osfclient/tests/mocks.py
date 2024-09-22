@@ -109,19 +109,14 @@ def MockProject(name):
     return mock
 
 
-def MockArgs(username=None, password=None, output=None, project=None,
+def MockArgs(output=None, project=None,
              source=None, destination=None, local=None, remote=None,
              target=None, force=False, update=False, recursive=False,
              base_url=None, long_format=False, base_path=None):
-    args = MagicMock(spec=['username', 'password', 'output', 'project',
+    args = MagicMock(spec=['output', 'project',
                            'source', 'destination', 'target', 'force',
                            'recursive', 'base_url', 'long_format',
                            'base_path'])
-    args._username_mock = PropertyMock(return_value=username)
-    type(args).username = args._username_mock
-    args._password_mock = PropertyMock(return_value=password)
-    type(args).password = args._password_mock
-
     args._output_mock = PropertyMock(return_value=output)
     type(args).output = args._output_mock
     args._project_mock = PropertyMock(return_value=project)

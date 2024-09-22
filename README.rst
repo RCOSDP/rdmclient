@@ -76,18 +76,17 @@ Below are some examples on how to use it:
     $ osf upload -r local/directory/ remote/directory
 
 If the project is private you will need to provide authentication
-details. The password will be retrieved from the ``OSF_PASSWORD``
+details. The personal access token will be retrieved from the ``OSF_TOKEN``
 environment variable or you will be asked directly by the tool when you
 run it.
 
 You can set default values by using a configuration file in the
 current directory. This is what ``osf init`` does for you. To set the
-username and project ID create ``.osfcli.config``:
+project ID create ``.osfcli.config``:
 
 ::
 
     [osf]
-    username = yourOSFaccount@example.com
     project = 9zpcy
 
 after which you can simply run ``osf ls`` to list the contents of the

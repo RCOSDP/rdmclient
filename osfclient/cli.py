@@ -5,7 +5,6 @@ These functions implement the functionality of the command-line interface.
 from __future__ import print_function
 
 from functools import wraps
-import getpass
 import os
 import sys
 
@@ -51,14 +50,6 @@ def config_from_env(config):
     return config
 
 
-def _get_username(args, config):
-    if args.username is None:
-        username = config.get('username')
-    else:
-        username = args.username
-    return username
-
-
 def _get_base_url(args, config):
     if args.base_url is None:
         base_url = config.get('base_url')
@@ -76,8 +67,6 @@ def _setup_osf(args):
     # which have precedence over the config file.
     config = config_from_env(config_from_file())
 
-    username = _get_username(args, config)
-
     project = config.get('project')
     if args.project is None:
         args.project = project
@@ -87,19 +76,9 @@ def _setup_osf(args):
                  ' configuration file or environment variable.')
 
     base_url = _get_base_url(args, config)
-    password = None
-    token = None
-    if username is not None:
-        password = os.getenv("OSF_PASSWORD")
+    token = _get_token()
 
-        # Prompt user when password is not set
-        if password is None:
-            password = getpass.getpass('Please input your password: ')
-    else:
-        token = _get_token()
-
-    return OSF(username=username, password=password, token=token,
-               base_url=base_url)
+    return OSF(token=token, base_url=base_url)
 
 
 def might_need_auth(f):
@@ -113,12 +92,10 @@ def might_need_auth(f):
         try:
             return_value = f(cli_args)
         except UnauthorizedException as e:
-            config = config_from_env(config_from_file())
-            username = _get_username(cli_args, config)
             token = _get_token()
 
-            if username is None and token is None:
-                sys.exit("Please set a username or token "
+            if token is None:
+                sys.exit("Please set a token "
                          "(run `osf -h` for details).")
             else:
                 sys.exit("You are not authorized to access this project.")
@@ -320,8 +297,7 @@ async def upload(args):
     """
     osf = _setup_osf(args)
     if not osf.has_auth:
-        sys.exit('To upload a file you need to provide a username and'
-                 ' password or token.')
+        sys.exit('To upload a file you need to provide a token.')
 
     project = await osf.project(args.project)
     storage, remote_path = split_storage(args.destination)
@@ -362,8 +338,7 @@ async def makefolder(args):
     """
     osf = _setup_osf(args)
     if not osf.has_auth:
-        sys.exit('To create a folder you need to provide a username and'
-                 ' password or token.')
+        sys.exit('To create a folder you need to provide a token.')
 
     project = await osf.project(args.project)
 
@@ -392,8 +367,7 @@ async def remove(args):
     """
     osf = _setup_osf(args)
     if not osf.has_auth:
-        sys.exit('To remove a file you need to provide a username and'
-                 ' password or token.')
+        sys.exit('To remove a file you need to provide a token.')
 
     project = await osf.project(args.project)
 
@@ -416,8 +390,7 @@ async def move(args):
     """
     osf = _setup_osf(args)
     if not osf.has_auth:
-        sys.exit('To move a file you need to provide a username and'
-                 ' password or token.')
+        sys.exit('To move a file you need to provide a token.')
 
     project = await osf.project(args.project)
 

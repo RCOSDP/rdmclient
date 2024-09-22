@@ -26,20 +26,19 @@ async def test_anonymous_doesnt_work():
                    side_effect=simple_getenv) as mock_getenv:
             await upload(args)
 
-    expected = 'upload a file you need to provide a username and password'
+    expected = 'upload a file you need to provide a token'
     assert expected in e.value.args[0]
 
 
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_select_project(OSF_project):
-    args = MockArgs(username='joe@example.com',
-                    project='1234',
+    args = MockArgs(project='1234',
                     source='foo/bar.txt',
                     destination='bar/bar/foo.txt')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -70,14 +69,13 @@ async def test_select_project(OSF_project):
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_recursive_requires_directory(OSF_project):
     # test that we check if source is a directory when using recursive mode
-    args = MockArgs(username='joe@example.com',
-                    project='1234',
+    args = MockArgs(project='1234',
                     source='foo/bar.txt',
                     recursive=True,
                     destination='bar/bar/foo.txt')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -94,14 +92,13 @@ async def test_recursive_requires_directory(OSF_project):
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_recursive_upload(OSF_project):
     # test that we check if source is a directory when using recursive mode
-    args = MockArgs(username='joe@example.com',
-                    project='1234',
+    args = MockArgs(project='1234',
                     source='foobar/',
                     recursive=True,
                     destination='BAR/')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -142,14 +139,13 @@ async def test_recursive_upload(OSF_project):
 async def test_recursive_upload_with_subdir(OSF_project):
     # test that an extra level of subdirectory is created on the remote side
     # this is because args.source does not end in a /
-    args = MockArgs(username='joe@example.com',
-                    project='1234',
+    args = MockArgs(project='1234',
                     source='foobar',
                     recursive=True,
                     destination='BAR/')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 

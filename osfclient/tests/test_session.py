@@ -8,17 +8,9 @@ from osfclient.models import OSFSession
 from osfclient.exceptions import UnauthorizedException
 
 
-def test_basic_auth():
-    session = OSFSession()
-    session.basic_auth('joe@example.com', 'secret_password')
-    assert session.auth == ('joe@example.com', 'secret_password')
-    assert 'Authorization' not in session.headers
-
-
 def test_token_auth():
     session = OSFSession()
     session.token_auth('0123456789abcd')
-    assert session.auth is None
     assert session.headers['Authorization'] == 'Bearer 0123456789abcd'
 
 

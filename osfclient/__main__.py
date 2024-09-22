@@ -31,9 +31,6 @@ async def main():
     parser = argparse.ArgumentParser(
         description=description,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-u', '--username', default=None,
-                        help=('OSF username. Provide your password via '
-                              'OSF_PASSWORD environment variable'))
     parser.add_argument('--base-url', default=None,
                         help='OSF API URL (Default is https://api.osf.io/v2/)')
     parser.add_argument('--base-path', default=None,

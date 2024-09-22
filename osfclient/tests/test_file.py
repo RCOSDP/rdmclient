@@ -11,7 +11,6 @@ from osfclient.models import OSFCore
 from osfclient.models import File
 from osfclient.models import Folder
 from osfclient.exceptions import FolderExistsException, UnauthorizedException
-from osfclient.models.file import _WaterButlerFolder
 
 from osfclient.tests import fake_responses
 from osfclient.tests.mocks import (
@@ -151,7 +150,7 @@ async def test_create_new_folder():
 
     new_folder = await folder.create_folder('foobar')
 
-    assert isinstance(new_folder, _WaterButlerFolder)
+    assert isinstance(new_folder, Folder)
 
     folder._put.assert_called_once_with(new_folder_url,
                                         params={'name': 'foobar'})

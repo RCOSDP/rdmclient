@@ -23,17 +23,17 @@ async def test_anonymous_doesnt_work():
                    side_effect=simple_getenv) as mock_getenv:
             await makefolder(args)
 
-    expected = 'create a folder you need to provide a username and password'
+    expected = 'create a folder you need to provide a token'
     assert expected in e.value.args[0]
 
 
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_make_sub_folder(OSF_project):
-    args = MockArgs(project='1234', username='joe', target='osfstorage/a/new')
+    args = MockArgs(project='1234', target='osfstorage/a/new')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -52,10 +52,10 @@ async def test_make_sub_folder(OSF_project):
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_make_root_folder(OSF_project):
-    args = MockArgs(project='1234', username='joe', target='osfstorage/new')
+    args = MockArgs(project='1234', target='osfstorage/new')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -72,10 +72,10 @@ async def test_make_root_folder(OSF_project):
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_make_recursive_sub_folder(OSF_project):
-    args = MockArgs(project='1234', username='joe', target='osfstorage/a/new1/new2')
+    args = MockArgs(project='1234', target='osfstorage/a/new1/new2')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -95,10 +95,10 @@ async def test_make_recursive_sub_folder(OSF_project):
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_make_recursive_root_folder(OSF_project):
-    args = MockArgs(project='1234', username='joe', target='osfstorage/new1/new2')
+    args = MockArgs(project='1234', target='osfstorage/new1/new2')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 
@@ -116,10 +116,10 @@ async def test_make_recursive_root_folder(OSF_project):
 @pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_wrong_storage_name(OSF_project):
-    args = MockArgs(project='1234', username='joe', target='DOESNTEXIST/a/a/a')
+    args = MockArgs(project='1234', target='DOESNTEXIST/a/a/a')
 
     def simple_getenv(key, default=None):
-        if key == 'OSF_PASSWORD':
+        if key == 'OSF_TOKEN':
             return 'secret'
         return default
 

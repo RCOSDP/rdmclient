@@ -1,4 +1,5 @@
 import numbers
+from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
 
 from .session import OSFSession
 
@@ -70,8 +71,17 @@ class OSFCore(object):
         response = self._json(await self._get(url), 200)
         yield response['data']
 
-        next_url = self._get_attribute(response, 'links', 'next')
-        while next_url is not None:
+        next_token = response.get('next_token', None)
+        while next_token is not None:
+            next_url = self._ensure_query_string(url, next_token=next_token)
             response = self._json(await self._get(next_url), 200)
             yield response['data']
-            next_url = self._get_attribute(response, 'links', 'next')
+            next_token = response.get('next_token', None)
+
+    def _ensure_query_string(self, url: str, **kwargs) -> str:
+        """Ensure that the URL has the query string parameters."""
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+        query.update(kwargs)
+        new_query = urlencode(query, doseq=True)
+        return urlunparse(parsed._replace(query=new_query))

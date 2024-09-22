@@ -22,7 +22,7 @@ Below some examples on how to use the command-line program:
     $ osf init
 
     # list all files for a private project
-    # set $OSF_PASSWORD to provide the password
+    # set $OSF_TOKEN to provide the token
     $ osf -p <projectid> -u yourOSFacount@example.com list
 
     # fetch all files from a project and store them in `output_directory`
@@ -44,19 +44,17 @@ If you're using python 3+, you can also use the aliases `ls` in place of `list`,
 
 
 If the project is private you will need to provide authentication
-details. You can provide your OSF account name as command-line argument
-(see the ``osf upload`` example) or set the ``OSF_USERNAME`` environment
-variable. The password will be retrieved from the ``OSF_PASSWORD``
+details. You can set the ``OSF_TOKEN`` environment
+variable. The personal access token will be retrieved from the ``OSF_TOKEN``
 environment variable or asked directly by the tool.
 
 You can set a default values by using a configuration file in the
-current directory. To set the username and project ID create
+current directory. To set the project ID create
 ``.osfcli.config``:
 
 ::
 
     [osf]
-    username = yourOSFaccount@example.com
     project = 9zpcy
 
 
