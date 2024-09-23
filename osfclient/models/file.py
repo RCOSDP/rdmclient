@@ -171,6 +171,30 @@ class ContainerMixin:
                                                            target_filter=target_filter):
                         yield entry
 
+    async def _iter_children_for_mixed_types(
+        self, url: str, klasses: Dict[str, Type], recurse=None, target_filter=None
+    ) -> AsyncGenerator[OSFCore, None]:
+        """Iterate over all children
+        _iter_children_for_mixed_types is a more general version of _iter_children
+        that can handle multiple kinds of children. It takes a dictionary of
+        `klasses` that maps kinds to classes.
+        """
+        async for children in self._follow_next(url):
+            for child in children:
+                if target_filter is not None and not target_filter(child):
+                    continue
+                kind = child['attributes']['kind']
+                klass = klasses.get(kind)
+                if klass is not None:
+                    yield klass(child, self.session)
+                if kind != 'file' and recurse is not None:
+                    # recurse into a child and add entries to `children`
+                    url = self._get_attribute(child, *recurse)
+                    async for entry in self._iter_children_for_mixed_types(
+                        url, klasses, recurse=recurse, target_filter=target_filter
+                    ):
+                        yield entry
+
     @property
     def files(self):
         """Iterate over all files in this folder.
@@ -184,6 +208,12 @@ class ContainerMixin:
     def folders(self):
         """Iterate over top-level folders in this folder."""
         return self._iter_children(self._files_url, 'folder', Folder)
+
+    @property
+    def children(self):
+        """Iterate over all children in this folder."""
+        return self._iter_children_for_mixed_types(self._files_url,
+                                                   {'file': File, 'folder': Folder})
 
     async def create_folder(self, name, exist_ok=False):
         url = self._new_folder_url

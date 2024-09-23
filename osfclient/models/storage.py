@@ -63,6 +63,12 @@ class Storage(OSFCore, ContainerMixin):
         """Iterate over all folders in this storage."""
         return self._iter_children(self._files_url, 'folder', Folder)
 
+    @property
+    def children(self):
+        """Iterate over all children in this storage."""
+        return self._iter_children_for_mixed_types(self._files_url,
+                                                   {'file': File, 'folder': Folder})
+
     async def create_file(self, path, fp, force=False, update=False):
         """Store a new file at `path` in this storage.
 

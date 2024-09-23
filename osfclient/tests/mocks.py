@@ -33,7 +33,8 @@ def MockFolder(name, files=None, folders=None):
         name='Folder-%s' % name, 
         path=name,
         files=AsyncIterator(files or []),
-        folders=AsyncIterator(folders or []))
+        folders=AsyncIterator(folders or []),
+        children=AsyncIterator((files or []) + (folders or [])))
     path = PropertyMock(return_value=name)
     type(mock).path = path
     mock._path_mock = path
@@ -58,7 +59,8 @@ def MockStorage(name):
         MockFolder('/b',folders=b_folders),
         MockFolder('/c',folders=c_folders)]
     mock = MagicMock(name='Storage-%s' % name,
-                     folders=AsyncIterator(folders))
+                     folders=AsyncIterator(folders),
+                     children=AsyncIterator(folders))
     mock.create_file = MagicMock(return_value=FutureWrapper())
     mock.create_folder = MagicMock(side_effect=lambda name: FutureWrapper(mock))
     name = PropertyMock(return_value=name)
