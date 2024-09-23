@@ -1,5 +1,6 @@
 from __future__ import print_function
 import asyncio
+import logging
 import sys
 import six
 import argparse
@@ -41,6 +42,8 @@ async def main():
                         help='OSF project ID')
     parser.add_argument('-v', '--version', action='version',
                         version='%(prog)s {}'.format(__version__))
+    parser.add_argument('--debug', action='store_true',
+                        help='Print debug messages')
     # dest=command stores the name of the command in a variable, this is
     # used later on to retrieve the correct sub-parser
     subparsers = parser.add_subparsers(dest='command')
@@ -130,6 +133,12 @@ async def main():
 
     args = parser.parse_args()
     if 'func' in args:
+        # set up logging
+        if args.debug:
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.WARNING)
+
         # give functions a chance to influence the exit code
         # this setup is so we can print usage for the sub command
         # even if there was an error further down
