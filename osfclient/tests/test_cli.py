@@ -101,13 +101,19 @@ def test_init(config_from_file):
                                                       'project': 'pj2'})
 def test_might_need_auth_unauthorized(config_from_file):
     mock_args = MockArgs(project='test')
+    def simple_getenv(key):
+        if key == 'OSF_TOKEN':
+            return 'secret'
+        return None
 
     @cli.might_need_auth
     def dummy(x):
         raise UnauthorizedException()
 
     with pytest.raises(SystemExit) as e:
-        dummy(mock_args)
+        with patch('osfclient.cli.os.getenv',
+                   side_effect=simple_getenv) as mock_getenv:
+            dummy(mock_args)
 
     assert "not authorized to access" in str(e.value)
 
