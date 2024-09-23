@@ -12,35 +12,38 @@ from osfclient.tests.mocks import MockArgs
 from osfclient.tests.mocks import MockProject
 
 
-def test_anonymous_doesnt_work():
+@pytest.mark.asyncio
+async def test_anonymous_doesnt_work():
     args = MockArgs(project='1234')
-    def simple_getenv(key):
-        return None
+    def simple_getenv(key, default=None):
+        return default
 
     with pytest.raises(SystemExit) as e:
         with patch('osfclient.cli.os.getenv',
                    side_effect=simple_getenv) as mock_getenv:
-            remove(args)
+            await remove(args)
 
     expected = 'remove a file you need to provide a username and password'
     assert expected in e.value.args[0]
 
 
+@pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_remove_file(OSF_project):
+async def test_remove_file(OSF_project):
     args = MockArgs(project='1234', username='joe', target='osfstorage/a/a/a')
 
-    def simple_getenv(key):
+    def simple_getenv(key, default=None):
         if key == 'OSF_PASSWORD':
             return 'secret'
+        return default
 
     with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
-        remove(args)
+        await remove(args)
 
     OSF_project.assert_called_once_with('1234')
 
     MockProject = OSF_project.return_value
-    MockStorage = MockProject._storage_mock.return_value
+    MockStorage = await MockProject._storage_mock.return_value
     for f in MockStorage.files:
         if f._path_mock.return_value == '/a/a/a':
             assert call.remove() in f.mock_calls
@@ -48,17 +51,19 @@ def test_remove_file(OSF_project):
         assert call.remove() not in f.mock_calls
 
 
+@pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_wrong_storage_name(OSF_project):
+async def test_wrong_storage_name(OSF_project):
     args = MockArgs(project='1234', username='joe', target='DOESNTEXIST/a/a/a')
 
-    def simple_getenv(key):
+    def simple_getenv(key, default=None):
         if key == 'OSF_PASSWORD':
             return 'secret'
+        return default
 
     with pytest.raises(SystemExit) as e:
         with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
-            remove(args)
+            await remove(args)
 
     expected = 'No files found to remove.'
     assert expected in e.value.args[0]
@@ -67,7 +72,7 @@ def test_wrong_storage_name(OSF_project):
 
     # the mock storage is called osfstorage, so we should not call remove()
     MockProject = OSF_project.return_value
-    MockStorage = MockProject._storage_mock.return_value
+    MockStorage = await MockProject._storage_mock.return_value
     for f in MockStorage.files:
         if f._path_mock.return_value == '/a/a/a':
             assert call.remove() not in f.mock_calls
@@ -75,18 +80,20 @@ def test_wrong_storage_name(OSF_project):
         assert call.remove() not in f.mock_calls
 
 
+@pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_non_existant_file(OSF_project):
+async def test_non_existant_file(OSF_project):
     args = MockArgs(project='1234', username='joe',
                     target='osfstorage/DOESNTEXIST/a')
 
-    def simple_getenv(key):
+    def simple_getenv(key, default=None):
         if key == 'OSF_PASSWORD':
             return 'secret'
+        return default
 
     with pytest.raises(SystemExit) as e:
         with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
-            remove(args)
+            await remove(args)
 
     expected = 'No files found to remove.'
     assert expected in e.value.args[0]
@@ -95,7 +102,7 @@ def test_non_existant_file(OSF_project):
 
     # check that all files in osfstorage are visited but non get deleted
     MockProject = OSF_project.return_value
-    MockStorage = MockProject._storage_mock.return_value
+    MockStorage = await MockProject._storage_mock.return_value
     for f in MockStorage.files:
         assert f._path_mock.called
         assert call.remove() not in f.mock_calls
@@ -104,21 +111,23 @@ def test_non_existant_file(OSF_project):
         assert call.remove() not in f.mock_calls
 
 
+@pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_remove_folder(OSF_project):
+async def test_remove_folder(OSF_project):
     args = MockArgs(project='1234', username='joe', target='osfstorage/a/a')
 
-    def simple_getenv(key):
+    def simple_getenv(key, default=None):
         if key == 'OSF_PASSWORD':
             return 'secret'
+        return default
 
     with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
-        remove(args)
+        await remove(args)
 
     OSF_project.assert_called_once_with('1234')
 
     MockProject = OSF_project.return_value
-    MockStorage = MockProject._storage_mock.return_value
+    MockStorage = await MockProject._storage_mock.return_value
     for f in MockStorage.files:
         assert call.remove() not in f.mock_calls
     for f in MockStorage.folders:
@@ -128,21 +137,23 @@ def test_remove_folder(OSF_project):
             assert call.remove() not in f.mock_calls
 
 
+@pytest.mark.asyncio
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
-def test_remove_folder_with_slash(OSF_project):
+async def test_remove_folder_with_slash(OSF_project):
     args = MockArgs(project='1234', username='joe', target='osfstorage/a/a/')
 
-    def simple_getenv(key):
+    def simple_getenv(key, default=None):
         if key == 'OSF_PASSWORD':
             return 'secret'
+        return default
 
     with patch('osfclient.cli.os.getenv', side_effect=simple_getenv):
-        remove(args)
+        await remove(args)
 
     OSF_project.assert_called_once_with('1234')
 
     MockProject = OSF_project.return_value
-    MockStorage = MockProject._storage_mock.return_value
+    MockStorage = await MockProject._storage_mock.return_value
     for f in MockStorage.files:
         assert call.remove() not in f.mock_calls
     for f in MockStorage.folders:

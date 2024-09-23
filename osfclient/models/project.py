@@ -27,9 +27,9 @@ class Project(OSFCore):
     def __str__(self):
         return '<Project [{0}]>'.format(self.id)
 
-    def storage(self, provider='osfstorage'):
+    async def storage(self, provider='osfstorage'):
         """Return storage `provider`."""
-        stores = self._json(self._get(self._storages_url), 200)
+        stores = self._json(await self._get(self._storages_url), 200)
         stores = stores['data']
         for store in stores:
             provides = self._get_attribute(store, 'attributes', 'provider')
@@ -40,9 +40,9 @@ class Project(OSFCore):
                            "provider '{}'".format(provider))
 
     @property
-    def storages(self):
+    async def storages(self):
         """Iterate over all storages for this projects."""
-        stores = self._json(self._get(self._storages_url), 200)
+        stores = self._json(await self._get(self._storages_url), 200)
         stores = stores['data']
         for store in stores:
             yield Storage(store, self.session)

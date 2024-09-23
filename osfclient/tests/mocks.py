@@ -1,6 +1,13 @@
-from mock import MagicMock, PropertyMock
+import asyncio
+from mock import MagicMock, PropertyMock, AsyncMock
 from ..utils import norm_remote_path
 import copy
+
+
+def FutureWrapper(value=None):
+    f = asyncio.Future()
+    f.set_result(value)
+    return f
 
 
 # When using a PropertyMock store it as an attribute
@@ -15,6 +22,9 @@ def MockFile(name):
     hashes = PropertyMock(return_value=hashes_dict)
     type(mock).hashes = hashes
     mock._hashes_mock = hashes
+    mock.write_to = MagicMock(return_value=FutureWrapper())
+    mock.move_to = MagicMock(return_value=FutureWrapper())
+    mock.remove = MagicMock(return_value=FutureWrapper())
     return mock
 
 
@@ -22,14 +32,18 @@ def MockFolder(name, files=None, folders=None):
     mock = MagicMock(
         name='Folder-%s' % name, 
         path=name,
-        files=files or [],
-        folders=folders or [])
+        files=AsyncIterator(files or []),
+        folders=AsyncIterator(folders or []))
     path = PropertyMock(return_value=name)
     type(mock).path = path
     mock._path_mock = path
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name
+    mock.move_to = MagicMock(return_value=FutureWrapper())
+    mock.create_file = MagicMock(return_value=FutureWrapper())
+    mock.create_folder = MagicMock(side_effect=lambda name: FutureWrapper(mock))
+    mock.remove = MagicMock(return_value=FutureWrapper())
     return mock
 
 
@@ -44,18 +58,26 @@ def MockStorage(name):
         MockFolder('/b',folders=b_folders),
         MockFolder('/c',folders=c_folders)]
     mock = MagicMock(name='Storage-%s' % name,
-                     folders=folders)
+                     folders=AsyncIterator(folders))
+    mock.create_file = MagicMock(return_value=FutureWrapper())
+    mock.create_folder = MagicMock(side_effect=lambda name: FutureWrapper(mock))
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name
     return mock
 
 
+def FutureMockStorage(name):
+    f = asyncio.Future()
+    f.set_result(MockStorage(name))
+    return f
+
+
 def MockProject(name):
     mock = MagicMock(name='Project-%s' % name,
-                     storages=[MockStorage('osfstorage'), MockStorage('gh')])
+                     storages=AsyncIterator([MockStorage('osfstorage'), MockStorage('gh')]))
     storage = MagicMock(name='Project-%s-storage' % name,
-                        return_value=MockStorage('osfstorage'))
+                        return_value=FutureMockStorage('osfstorage'))
     type(mock).storage = storage
     mock._storage_mock = storage
 
@@ -121,3 +143,22 @@ class FakeResponse:
     
 def is_folder_mock(file_or_folder):
     return file_or_folder._mock_name.startswith('Folder-')
+
+
+def FutureFakeResponse(status_code, json):
+    return FutureWrapper(FakeResponse(status_code, json))
+
+
+def AsyncIterator(items):
+    mock = AsyncMock()
+    mock.__aiter__.return_value = items
+    return mock
+
+
+class FutureStreamResponse(MagicMock):
+    def __init__(self, response):
+        super(FutureStreamResponse, self).__init__()
+        resp = MagicMock()
+        resp.status_code = response.status_code
+        resp.aiter_bytes = lambda: AsyncIterator([response.raw])
+        self.__aenter__ = MagicMock(return_value=FutureWrapper(resp))

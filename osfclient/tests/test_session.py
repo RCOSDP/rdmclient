@@ -1,3 +1,4 @@
+import asyncio
 from mock import patch
 from mock import MagicMock
 
@@ -24,12 +25,13 @@ def test_token_auth():
 def test_basic_build_url():
     session = OSFSession()
     url = session.build_url("some", "path")
-    assert url.startswith(session.base_url)
+    assert url.startswith(str(session.base_url))
     assert url.endswith("/some/path/")
 
 
-@patch('osfclient.models.session.requests.Session.put')
-def test_unauthorized_put(mock_put):
+@pytest.mark.asyncio
+@patch('osfclient.models.session.httpx.AsyncClient.put')
+async def test_unauthorized_put(mock_put):
     mock_response = MagicMock()
     mock_response.status_code = 401
 
@@ -40,13 +42,14 @@ def test_unauthorized_put(mock_put):
     session = OSFSession()
 
     with pytest.raises(UnauthorizedException):
-        session.put(url)
+        await session.put(url)
 
-    mock_put.assert_called_once_with(url)
+    mock_put.assert_called_once_with(url, follow_redirects=True)
 
 
-@patch('osfclient.models.session.requests.Session.get')
-def test_unauthorized_get(mock_get):
+@pytest.mark.asyncio
+@patch('osfclient.models.session.httpx.AsyncClient.get')
+async def test_unauthorized_get(mock_get):
     mock_response = MagicMock()
     mock_response.status_code = 401
 
@@ -57,13 +60,14 @@ def test_unauthorized_get(mock_get):
     session = OSFSession()
 
     with pytest.raises(UnauthorizedException):
-        session.get(url)
+        await session.get(url)
 
-    mock_get.assert_called_once_with(url)
+    mock_get.assert_called_once_with(url, follow_redirects=True)
 
 
-@patch('osfclient.models.session.requests.Session.put')
-def test_put(mock_put):
+@pytest.mark.asyncio
+@patch('osfclient.models.session.httpx.AsyncClient.put')
+async def test_put(mock_put):
     mock_response = MagicMock()
     mock_response.status_code = 200
 
@@ -73,14 +77,15 @@ def test_put(mock_put):
 
     session = OSFSession()
 
-    response = session.put(url)
+    response = await session.put(url)
 
     assert response == mock_response
-    mock_put.assert_called_once_with(url)
+    mock_put.assert_called_once_with(url, follow_redirects=True)
 
 
-@patch('osfclient.models.session.requests.Session.get')
-def test_get(mock_get):
+@pytest.mark.asyncio
+@patch('osfclient.models.session.httpx.AsyncClient.get')
+async def test_get(mock_get):
     mock_response = MagicMock()
     mock_response.status_code = 200
 
@@ -90,7 +95,7 @@ def test_get(mock_get):
 
     session = OSFSession()
 
-    response = session.get(url)
+    response = await session.get(url)
 
     assert response == mock_response
-    mock_get.assert_called_once_with(url)
+    mock_get.assert_called_once_with(url, follow_redirects=True)

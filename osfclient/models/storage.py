@@ -12,6 +12,7 @@ from ..utils import file_empty
 from ..utils import get_local_file_size
 from ..utils import norm_remote_path
 from ..utils import flatten
+from ..utils import find_by_path
 from ..utils import is_folder
 
 
@@ -56,7 +57,7 @@ class Storage(OSFCore, ContainerMixin):
         """Iterate over all folders in this storage."""
         return self._iter_children(self._files_url, 'folder', Folder)
 
-    def create_file(self, path, fp, force=False, update=False):
+    async def create_file(self, path, fp, force=False, update=False):
         """Store a new file at `path` in this storage.
 
         The contents of the file descriptor `fp` (opened in 'rb' mode)
@@ -66,7 +67,8 @@ class Storage(OSFCore, ContainerMixin):
         To force overwrite of an existing file, set `force=True`.
         To overwrite an existing file only if the files differ, set `update=True`
         """
-        if 'b' not in fp.mode:
+        from ..utils import find_by_path
+        if hasattr(fp, 'mode') and 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
         # all paths are assumed to be absolute
@@ -79,7 +81,7 @@ class Storage(OSFCore, ContainerMixin):
         for directory in directories:
             # skip empty directory names
             if directory:
-                parent = parent.create_folder(directory, exist_ok=True)
+                parent = await parent.create_folder(directory, exist_ok=True)
 
         url = parent._new_file_url
 
@@ -92,10 +94,10 @@ class Storage(OSFCore, ContainerMixin):
         # turns out to be of length zero then no file is created on the OSF.
         # See: https://github.com/osfclient/osfclient/pull/135
         if file_empty(fp):
-            response = self._put(url, params={'name': fname}, data=b'')
+            response = await self._put(url, params={'name': fname}, data=b'')
         else:
             try:
-                response = self._put(url, params={'name': fname}, data=fp)
+                response = await self._put(url, params={'name': fname}, data=fp)
             except ConnectionError:
                 connection_error = True
 
@@ -118,21 +120,19 @@ class Storage(OSFCore, ContainerMixin):
 
             else:
                 # find the upload URL for the file we are trying to update
-                for file_ in flatten(self):
-                    if is_folder(file_):
-                        continue
-                    if norm_remote_path(file_.path) == path:
-                        if not force:
-                            if checksum(path) == file_.hashes.get('md5'):
-                                # If the hashes are equal and force is False,
-                                # we're done here
-                                break
-                        # in the process of attempting to upload the file we
-                        # moved through it -> reset read position to beginning
-                        # of the file
-                        fp.seek(0)
-                        file_.update(fp)
-                        break
-                else:
+                file_ = await find_by_path(self, path)
+                if file_ is None:
                     raise RuntimeError("Could not create a new file at "
-                                       "({}) nor update it.".format(path))
+                                    "({}) nor update it.".format(path))
+                if is_folder(file_):
+                    raise RuntimeError("Cannot update a folder.")
+                if not force:
+                    if checksum(path) == file_.hashes.get('md5'):
+                        # If the hashes are equal and force is False,
+                        # we're done here
+                        return
+                # in the process of attempting to upload the file we
+                # moved through it -> reset read position to beginning
+                # of the file
+                fp.seek(0)
+                await file_.update(fp)

@@ -1,3 +1,4 @@
+import io
 from tqdm import tqdm
 
 from .core import OSFCore
@@ -65,59 +66,62 @@ class File(OSFCore):
     def __str__(self):
         return '<File [{0}, {1}]>'.format(self.id, self.path)
 
-    def write_to(self, fp):
+    async def write_to(self, fp):
         """Write contents of this file to a local file.
 
         Pass in a filepointer `fp` that has been opened for writing in
         binary mode.
         """
-        if 'b' not in fp.mode:
+        if hasattr(fp, 'mode') and 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
         try:
-            response = self._get(self._download_url, stream=True)
+            await self._write_to(fp, self._download_url)
         except UnauthorizedException:
-            response = self._get(self._upload_url, stream=True)
-        if response.status_code == 200:
-            response.raw.decode_content = True
-            copyfileobj(response.raw, fp,
-                        int(response.headers['Content-Length'])
-                        if 'Content-Length' in response.headers else None)
+            await self._write_to(fp, self._upload_url)
 
-        else:
-            raise RuntimeError("Response has status "
-                               "code {}.".format(response.status_code))
+    async def _write_to(self, fp, url):
+        async with self._stream('GET', url) as response:
+            if response.status_code == 401:
+                raise UnauthorizedException()
+            if response.status_code == 200:
+                async for data in response.aiter_bytes():
+                    fp.write(data)
+                fp.flush()
+            else:
+                raise RuntimeError("Response has status "
+                                "code {}.".format(response.status_code))
 
-    def remove(self):
+    async def remove(self):
         """Remove this file from the remote storage."""
-        response = self._delete(self._delete_url)
+        response = await self._delete(self._delete_url)
         if response.status_code != 204:
             raise RuntimeError('Could not delete {}.'.format(self.path))
 
-    def update(self, fp):
+    async def update(self, fp):
         """Update the remote file from a local file.
 
         Pass in a filepointer `fp` that has been opened for writing in
         binary mode.
         """
-        if 'b' not in fp.mode:
+        if hasattr(fp, 'mode') and 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
         url = self._upload_url
         # peek at the file to check if it is an ampty file which needs special
         # handling in requests. If we pass a file like object to data that
         # turns out to be of length zero then no file is created on the OSF
-        if fp.peek(1):
-            response = self._put(url, data=fp)
+        if not hasattr(fp, 'peek') or fp.peek(1):
+            response = await self._put(url, data=fp)
         else:
-            response = self._put(url, data=b'')
+            response = await self._put(url, data=b'')
 
         if response.status_code != 200:
             msg = ('Could not update {} (status '
                    'code: {}).'.format(self.path, response.status_code))
             raise RuntimeError(msg)
 
-    def move_to(self, storage, to_folder, to_filename=None, force=False):
+    async def move_to(self, storage, to_folder, to_filename=None, force=False):
         """Move this file to the remote storage."""
         try:
             path = to_folder.osf_path
@@ -128,7 +132,7 @@ class File(OSFCore):
             body['rename'] = to_filename
         if force:
             body['conflict'] = 'replace'
-        response = self._post(self._move_url, json=body)
+        response = await self._post(self._move_url, json=body)
         if response.status_code != 200 and response.status_code != 201:
             raise RuntimeError('Could not move {} (status '
                                'code: {}).'.format(self.path,
@@ -136,7 +140,7 @@ class File(OSFCore):
 
 
 class ContainerMixin:
-    def _iter_children(self, url, kind, klass, recurse=None,
+    async def _iter_children(self, url, kind, klass, recurse=None,
                        target_filter=None):
         """Iterate over all children of `kind`
 
@@ -144,19 +148,20 @@ class ContainerMixin:
         `recurse` as the path of attributes in the JSON returned from `url`
         to find more children.
         """
-        children = self._follow_next(url)
-
-        while children:
-            child = children.pop()
-            if target_filter is not None and not target_filter(child):
-                continue
-            kind_ = child['attributes']['kind']
-            if kind_ == kind:
-                yield klass(child, self.session)
-            if kind_ != 'file' and recurse is not None:
-                # recurse into a child and add entries to `children`
-                url = self._get_attribute(child, *recurse)
-                children.extend(self._follow_next(url))
+        async for children in self._follow_next(url):
+            for child in children:
+                if target_filter is not None and not target_filter(child):
+                    continue
+                kind_ = child['attributes']['kind']
+                if kind_ == kind:
+                    yield klass(child, self.session)
+                if kind_ != 'file' and recurse is not None:
+                    # recurse into a child and add entries to `children`
+                    url = self._get_attribute(child, *recurse)
+                    async for entry in self._iter_children(url, kind, klass,
+                                                           recurse=recurse,
+                                                           target_filter=target_filter):
+                        yield entry
 
     @property
     def files(self):
@@ -172,15 +177,15 @@ class ContainerMixin:
         """Iterate over top-level folders in this folder."""
         return self._iter_children(self._files_url, 'folder', Folder)
 
-    def create_folder(self, name, exist_ok=False):
+    async def create_folder(self, name, exist_ok=False):
         url = self._new_folder_url
         # Create a new sub-folder
-        response = self._put(url, params={'name': name})
+        response = await self._put(url, params={'name': name})
         if response.status_code == 409 and not exist_ok:
             raise FolderExistsException(name)
 
         elif response.status_code == 409 and exist_ok:
-            for folder in self.folders:
+            async for folder in self.folders:
                 if folder.name == name:
                     return folder
 
@@ -223,13 +228,13 @@ class Folder(OSFCore, ContainerMixin):
     def __str__(self):
         return '<Folder [{0}, {1}]>'.format(self.id, self.path)
 
-    def remove(self):
+    async def remove(self):
         """Remove this folder from the remote storage."""
-        response = self._delete(self._delete_url)
+        response = await self._delete(self._delete_url)
         if response.status_code != 204:
             raise RuntimeError('Could not delete {}.'.format(self.path))
 
-    def move_to(self, storage, to_folder, to_foldername=None, force=False):
+    async def move_to(self, storage, to_folder, to_foldername=None, force=False):
         """Move this file to the remote storage."""
         try:
             path = to_folder.osf_path
@@ -240,7 +245,7 @@ class Folder(OSFCore, ContainerMixin):
             body['rename'] = to_foldername
         if force:
             body['conflict'] = 'replace'
-        response = self._post(self._move_url, json=body)
+        response = await self._post(self._move_url, json=body)
         if response.status_code != 200 and response.status_code != 201:
             raise RuntimeError('Could not move {} (status '
                                'code: {}).'.format(self.path,

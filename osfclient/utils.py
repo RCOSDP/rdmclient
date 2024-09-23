@@ -60,12 +60,14 @@ def makedirs(path, mode=511, exist_ok=False):
 
 def file_empty(fp):
     """Determine if a file is empty or not."""
+    if not hasattr(fp, 'peek'):
+        # If a Reader does not support peek, it is not considered empty
+        return False
     # for python 2 we need to use a homemade peek()
     if six.PY2:
         contents = fp.read()
         fp.seek(0)
         return not bool(contents)
-
     else:
         return not fp.peek()
 
@@ -133,16 +135,17 @@ def is_folder(file_or_folder):
     return hasattr(file_or_folder, 'files')
 
 
-def flatten(store):
+async def flatten(store):
     files = store.files
-    for file_ in files:
+    async for file_ in files:
         yield file_
-    for folder_ in store.folders:
+    async for folder_ in store.folders:
         yield folder_
-        yield from flatten(folder_)
+        async for file_ in flatten(folder_):
+            yield file_
 
 
-def find_ancestral_folder(store, target_file_path):
+async def find_ancestral_folder(store, target_file_path):
     file_path_segs = target_file_path.split('/')
     if(len(file_path_segs) <= 1):
         return None
@@ -153,7 +156,7 @@ def find_ancestral_folder(store, target_file_path):
     for i in range(len(file_path_segs) - 1):
         path += file_path_segs[i]
         is_found = False
-        for folder_ in folder.folders:
+        async for folder_ in folder.folders:
             if norm_remote_path(folder_.path) == path:
                 folder = folder_
                 is_found = True
@@ -164,41 +167,43 @@ def find_ancestral_folder(store, target_file_path):
     return folder if i > 0 or is_found else None
 
 
-def find_by_path(store, target_file_path):
+async def find_by_path(store, target_file_path):
     if target_file_path is None:
         return None
     file_path_segs = target_file_path.split('/')
     if(len(file_path_segs) == 1):
-        for file_ in store.files:
+        async for file_ in store.files:
             if norm_remote_path(file_.path) == target_file_path:
                 return file_
-        for folder_ in store.folders:
+        async for folder_ in store.folders:
             if norm_remote_path(folder_.path) == target_file_path:
                 return folder_
         return None
     else:
         parent_target_file_path = '/'.join(file_path_segs[:-1])
-        parent_result = find_by_path(store, parent_target_file_path)
+        parent_result = await find_by_path(store, parent_target_file_path)
         if parent_result is None:
             return None
         else:
             if is_folder(parent_result):
-                for file_ in parent_result.files:
+                async for file_ in parent_result.files:
                     if norm_remote_path(file_.path) == target_file_path:
                         return file_
-                for folder_ in parent_result.folders:
+                async for folder_ in parent_result.folders:
                     if norm_remote_path(folder_.path) == target_file_path:
                         return folder_
             return None
 
 
-def filter_by_path_pattern(store, target_file_path):
-    yield from _filter_by_path_pattern(store, target_file_path, 0)
+async def filter_by_path_pattern(store, target_file_path):
+    async for file_ in _filter_by_path_pattern(store, target_file_path, 0):
+        yield file_
 
 
-def _filter_by_path_pattern(store, target_file_path, depth):
+async def _filter_by_path_pattern(store, target_file_path, depth):
     if target_file_path is None or target_file_path == '/':
-        yield from flatten(store)
+        async for file_ in flatten(store):
+            yield file_
         return
     file_path_segs = target_file_path.split('/')
     if file_path_segs[0] == '':
@@ -206,24 +211,25 @@ def _filter_by_path_pattern(store, target_file_path, depth):
     if file_path_segs[-1] == '':
         file_path_segs = file_path_segs[:-1]
     if(len(file_path_segs) == 1):
-        for file_ in store.files:
+        async for file_ in store.files:
             if _is_path_matched(target_file_path, file_.path):
                 yield file_
-        for folder_ in store.folders:
+        async for folder_ in store.folders:
             if _is_path_matched(target_file_path, folder_.path):
                 yield folder_
                 if depth == 0:
-                    yield from flatten(folder_)
+                    async for file_ in flatten(folder_):
+                        yield file_
     else:
         parent_target_file_path = '/' + '/'.join(file_path_segs[:-1]) + '/'
-        parent_result = _filter_by_path_pattern(store, parent_target_file_path, depth + 1)
-        for rf_ in parent_result:
+        async for rf_ in _filter_by_path_pattern(store, parent_target_file_path, depth + 1):
             if is_folder(rf_):
-                for file_ in rf_.files:
+                async for file_ in rf_.files:
                     if _is_path_matched(target_file_path, file_.path):
                         yield file_
-                for folder_ in rf_.folders:
+                async for folder_ in rf_.folders:
                     if _is_path_matched(target_file_path, folder_.path):
                         yield folder_
                         if depth == 0:
-                            yield from flatten(folder_)
+                            async for file_ in flatten(folder_):
+                                yield file_
