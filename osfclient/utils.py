@@ -9,7 +9,13 @@ import six
 import aiofiles
 
 
-KNOWN_PROVIDERS = ['osfstorage', 'github', 'figshare', 'googledrive']
+KNOWN_PROVIDERS = [
+    'osfstorage', 'github', 'figshare', 'googledrive',
+    'azureblobstorage', 'bitbucket', 'box', 'dataverse', 'dropbox',
+    'gitlab', 'iqbrims', 'nextcloud', 'nextcloudinstitutions',
+    'ociinstitutions', 'owncloud', 'onedrivebusiness', 's3', 's3compat',
+    's3compatb3', 's3compatinstitutions', 'swift', 'weko'
+]
 
 
 def norm_remote_path(path: str) -> str:
