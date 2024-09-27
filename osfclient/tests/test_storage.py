@@ -4,7 +4,7 @@ import os
 import pytest
 import six
 
-from requests.exceptions import ConnectionError
+from httpx import HTTPError
 
 from osfclient.models import OSFCore
 from osfclient.models import Storage
@@ -446,13 +446,13 @@ async def test_create_new_zero_length_file():
 
 @pytest.mark.asyncio
 async def test_create_small_file_connection_error():
-    # turn a requests.ConnectionError into a RuntimeError with a more helpful
+    # turn a httpx.HTTPError into a RuntimeError with a more helpful
     # message that the file might exist
     new_file_url = ('https://files.osf.io/v1/resources/9zpcy/providers/' +
                     'osfstorage/foo123/')
     store = Storage({})
     store._new_file_url = new_file_url
-    store._put = MagicMock(side_effect=ConnectionError)
+    store._put = MagicMock(side_effect=HTTPError('MockError'))
 
     try:
         exception = RuntimeError
@@ -481,7 +481,7 @@ async def test_create_big_file_connection_error(monkeypatch):
                     'osfstorage/foo123/')
     store = Storage({})
     store._new_file_url = new_file_url
-    store._put = MagicMock(side_effect=ConnectionError)
+    store._put = MagicMock(side_effect=HTTPError('MockError'))
 
     try:
         exception = FileExistsError
@@ -512,7 +512,7 @@ async def test_update_existing_file_overrides_connection_error():
 
     def simple_OSFCore_put(url, params=None, content=None):
         if url == new_file_url:
-            raise ConnectionError
+            raise HTTPError('MockError')
         elif url.endswith("osfstorage/foo.txt"):
             return FakeResponse(200, None)
 

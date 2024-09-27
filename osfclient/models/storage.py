@@ -3,7 +3,7 @@ import logging
 import os
 import six
 
-from requests.exceptions import ConnectionError
+from httpx import HTTPError
 
 from .core import OSFCore
 from .file import ContainerMixin
@@ -97,7 +97,7 @@ class Storage(OSFCore, ContainerMixin):
         url = parent._new_file_url
 
         # When uploading a large file (>a few MB) that already exists
-        # we sometimes get a ConnectionError instead of a status == 409.
+        # we sometimes get a HTTPError instead of a status == 409.
         connection_error = False
 
         # peek at the file to check if it is an empty file which needs special
@@ -112,7 +112,7 @@ class Storage(OSFCore, ContainerMixin):
             logger.info("Uploading file: %s", path)
             try:
                 response = await self._put(url, params={'name': fname}, content=fp)
-            except ConnectionError:
+            except HTTPError:
                 connection_error = True
                 logger.info("Connection error while uploading file: %s", path)
 
