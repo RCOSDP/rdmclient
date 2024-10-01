@@ -1,5 +1,13 @@
-from mock import MagicMock, PropertyMock
-from ..utils import norm_remote_path, is_path_matched
+import asyncio
+from mock import MagicMock, PropertyMock, AsyncMock
+from ..utils import norm_remote_path
+import copy
+
+
+def FutureWrapper(value=None):
+    f = asyncio.Future()
+    f.set_result(value)
+    return f
 
 
 # When using a PropertyMock store it as an attribute
@@ -14,65 +22,101 @@ def MockFile(name):
     hashes = PropertyMock(return_value=hashes_dict)
     type(mock).hashes = hashes
     mock._hashes_mock = hashes
+    mock.write_to = MagicMock(return_value=FutureWrapper())
+    mock.move_to = MagicMock(return_value=FutureWrapper())
+    mock.remove = MagicMock(return_value=FutureWrapper())
     return mock
 
 
-def MockFolder(name):
-    mock = MagicMock(name='Folder-%s' % name, path=name)
+def MockFolder(name, files=None, folders=None):
+    mock = MagicMock(
+        name='Folder-%s' % name, 
+        path=name,
+        files=AsyncIterator(files or []),
+        folders=AsyncIterator(folders or []),
+        children=AsyncIterator((files or []) + (folders or [])))
     path = PropertyMock(return_value=name)
     type(mock).path = path
     mock._path_mock = path
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name
+    mock.move_to = MagicMock(return_value=FutureWrapper())
+    mock.create_file = MagicMock(return_value=FutureWrapper())
+    mock.create_folder = MagicMock(side_effect=lambda name: FutureWrapper(mock))
+    mock.remove = MagicMock(return_value=FutureWrapper())
     return mock
 
 
 def MockStorage(name):
-    def make_matched_files(mock):
-        def make_raw_file(file):
-            return {'attributes': {'materialized_path': '/' + norm_remote_path(file._path_mock.return_value)}}
-        def matched_files(target_filter):
-            return [f for f in mock.files if target_filter(make_raw_file(f))]
-        return matched_files
-
+    a_a_files = [MockFile('/a/a/a')]
+    b_b_files = [MockFile('/b/b/b')]
+    a_folders = [MockFolder('/a/a',files=a_a_files)]
+    b_folders = [MockFolder('/b/b',files=b_b_files)]
+    c_folders = [MockFolder('/c/c')]
+    folders = [
+        MockFolder('/a',folders=a_folders),
+        MockFolder('/b',folders=b_folders),
+        MockFolder('/c',folders=c_folders)]
     mock = MagicMock(name='Storage-%s' % name,
-                     files=[MockFile('/a/a/a'), MockFile('b/b/b')],
-                     folders=[MockFolder('/a'), MockFolder('/a/a'),
-                              MockFolder('/c'), MockFolder('/c/c')])
+                     folders=AsyncIterator(folders),
+                     children=AsyncIterator(folders))
+    mock.create_file = MagicMock(return_value=FutureWrapper())
+    mock.create_folder = MagicMock(side_effect=lambda name: FutureWrapper(mock))
     name = PropertyMock(return_value=name)
     type(mock).name = name
     mock._name_mock = name
-    matched_files = MagicMock(side_effect=make_matched_files(mock))
-    type(mock).matched_files = matched_files
-    mock._matched_files_mock = matched_files
+    return mock
+
+
+def FutureMockStorage(name):
+    f = asyncio.Future()
+    f.set_result(MockStorage(name))
+    return f
+
+
+def MockAsyncContextManager(target):
+    mock = AsyncMock()
+    mock.__aenter__.return_value = target
+    return mock
+
+
+def MockAsyncWriter(fp):
+    def write_async(data):
+        fp.write(data)
+        return FutureWrapper()
+    mock = AsyncMock()
+    mock.write.side_effect = write_async
+    mock.mode = fp.mode
+    return mock
+
+
+def MockStream(path, mode, size=1024):
+    mock = MagicMock(name='Stream-%s' % path, mode=mode)
+    mock.seek = MagicMock(return_value=FutureWrapper())
+    mock.tell = MagicMock(return_value=FutureWrapper(size))
     return mock
 
 
 def MockProject(name):
     mock = MagicMock(name='Project-%s' % name,
-                     storages=[MockStorage('osfstorage'), MockStorage('gh')])
+                     storages=AsyncIterator([MockStorage('osfstorage'), MockStorage('gh')]))
     storage = MagicMock(name='Project-%s-storage' % name,
-                        return_value=MockStorage('osfstorage'))
+                        return_value=FutureMockStorage('osfstorage'))
     type(mock).storage = storage
     mock._storage_mock = storage
 
     return mock
 
 
-def MockArgs(username=None, password=None, output=None, project=None,
+def MockArgs(output=None, project=None,
              source=None, destination=None, local=None, remote=None,
              target=None, force=False, update=False, recursive=False,
              base_url=None, long_format=False, base_path=None):
-    args = MagicMock(spec=['username', 'password', 'output', 'project',
+    args = MagicMock(spec=['output', 'project',
                            'source', 'destination', 'target', 'force',
                            'recursive', 'base_url', 'long_format',
                            'base_path'])
-    args._username_mock = PropertyMock(return_value=username)
-    type(args).username = args._username_mock
-    args._password_mock = PropertyMock(return_value=password)
-    type(args).password = args._password_mock
-
     args._output_mock = PropertyMock(return_value=output)
     type(args).output = args._output_mock
     args._project_mock = PropertyMock(return_value=project)
@@ -115,4 +159,36 @@ class FakeResponse:
         self._json = json
 
     def json(self):
-        return self._json
+        return copy.deepcopy(self._json)
+    
+def is_folder_mock(file_or_folder):
+    return file_or_folder._mock_name.startswith('Folder-')
+
+
+def FutureFakeResponse(status_code, json):
+    return FutureWrapper(FakeResponse(status_code, json))
+
+
+def AsyncIterator(items):
+    mock = AsyncMock()
+    mock.__aiter__.return_value = items
+    return mock
+
+
+class FutureStreamResponse(MagicMock):
+    def __init__(self, response):
+        super(FutureStreamResponse, self).__init__()
+        resp = MagicMock()
+        resp.status_code = response.status_code
+        resp.aiter_bytes = lambda: AsyncIterator([response.raw])
+        self.__aenter__ = MagicMock(return_value=FutureWrapper(resp))
+def is_folder_mock(file_or_folder):
+    return file_or_folder._mock_name.startswith('Folder-')
+
+
+def mock_async_open(stream=None):
+    return MagicMock(
+        side_effect=lambda path, mode: MockAsyncContextManager(
+            MockStream(path, mode) if stream is None else stream
+        )
+    )

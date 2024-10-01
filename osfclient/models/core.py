@@ -1,4 +1,5 @@
 import numbers
+from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
 
 from .session import OSFSession
 
@@ -19,17 +20,20 @@ class OSFCore(object):
     def _build_url(self, *args):
         return self.session.build_url(*args)
 
-    def _get(self, url, *args, **kwargs):
-        return self.session.get(url, *args, **kwargs)
+    async def _get(self, url, *args, **kwargs):
+        return await self.session.get(url, *args, **kwargs)
 
-    def _put(self, url, *args, **kwargs):
-        return self.session.put(url, *args, **kwargs)
+    def _stream(self, method, url, *args, **kwargs):
+        return self.session.stream(method, url, *args, **kwargs)
 
-    def _post(self, url, *args, **kwargs):
-        return self.session.post(url, *args, **kwargs)
+    async def _put(self, url, *args, **kwargs):
+        return await self.session.put(url, *args, **kwargs)
 
-    def _delete(self, url, *args, **kwargs):
-        return self.session.delete(url, *args, **kwargs)
+    async def _post(self, url, *args, **kwargs):
+        return await self.session.post(url, *args, **kwargs)
+
+    async def _delete(self, url, *args, **kwargs):
+        return await self.session.delete(url, *args, **kwargs)
 
     def _get_attribute(self, json, *keys, **kwargs):
         # pick value out of a (nested) dictionary/JSON
@@ -62,15 +66,22 @@ class OSFCore(object):
                                "code {} not {}".format(response.status_code,
                                                        status_code))
 
-    def _follow_next(self, url):
+    async def _follow_next(self, url):
         """Follow the 'next' link on paginated results."""
-        response = self._json(self._get(url), 200)
-        data = response['data']
+        response = self._json(await self._get(url), 200)
+        yield response['data']
 
-        next_url = self._get_attribute(response, 'links', 'next')
-        while next_url is not None:
-            response = self._json(self._get(next_url), 200)
-            data.extend(response['data'])
-            next_url = self._get_attribute(response, 'links', 'next')
+        next_token = response.get('next_token', None)
+        while next_token is not None:
+            next_url = self._ensure_query_string(url, next_token=next_token)
+            response = self._json(await self._get(next_url), 200)
+            yield response['data']
+            next_token = response.get('next_token', None)
 
-        return data
+    def _ensure_query_string(self, url: str, **kwargs) -> str:
+        """Ensure that the URL has the query string parameters."""
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+        query.update(kwargs)
+        new_query = urlencode(query, doseq=True)
+        return urlunparse(parsed._replace(query=new_query))

@@ -52,10 +52,8 @@ setup(
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.8',
         'License :: OSI Approved :: BSD License',
         'Topic :: Utilities'
     ],
@@ -77,7 +75,7 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            'osf=osfclient.__main__:main',
+            'osf=osfclient.__main__:run_main',
         ],
     },
 )

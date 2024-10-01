@@ -1,16 +1,25 @@
+from functools import partial
+import logging
 import os
 import six
 
-from requests.exceptions import ConnectionError
+from httpx import HTTPError
 
 from .core import OSFCore
 from .file import ContainerMixin
 from .file import File
 from .file import Folder
-from ..utils import checksum
 from ..utils import file_empty
 from ..utils import get_local_file_size
 from ..utils import norm_remote_path
+from ..utils import find_by_path
+from ..utils import is_folder
+from ..utils import checksum_fp
+from ..utils import norm_remote_path
+from ..utils import find_by_path
+
+
+logger = logging.getLogger(__name__)
 
 
 if six.PY2:
@@ -22,7 +31,7 @@ if six.PY2:
 
 
 class Storage(OSFCore, ContainerMixin):
-    _files_key = ('relationships', 'files', 'links', 'related', 'href')
+    _files_key = ('links', 'upload')
 
     def _update_attributes(self, storage):
         if not storage:
@@ -46,31 +55,21 @@ class Storage(OSFCore, ContainerMixin):
 
     @property
     def files(self):
-        """Iterate over all files in this storage.
-
-        Recursively lists all files in all subfolders.
-        """
-        return self._iter_children(self._files_url, 'file', File,
-                                   self._files_key)
+        """Iterate over all files in this storage."""
+        return self._iter_children(self._files_url, 'file', File)
 
     @property
     def folders(self):
-        """Iterate over all folders in this storage.
+        """Iterate over all folders in this storage."""
+        return self._iter_children(self._files_url, 'folder', Folder)
 
-        Recursively lists all folders in all subfolders.
-        """
-        return self._iter_children(self._files_url, 'folder', Folder,
-                                   self._files_key)
+    @property
+    def children(self):
+        """Iterate over all children in this storage."""
+        return self._iter_children_for_mixed_types(self._files_url,
+                                                   {'file': File, 'folder': Folder})
 
-    def matched_files(self, target_filter):
-        """Iterate all matched files in this storage.
-
-        Recursively lists files in all subfolders.
-        """
-        return self._iter_children(self._files_url, 'file', File,
-                                   self._files_key, target_filter)
-
-    def create_file(self, path, fp, force=False, update=False):
+    async def create_file(self, path: str, fp, force=False, update=False):
         """Store a new file at `path` in this storage.
 
         The contents of the file descriptor `fp` (opened in 'rb' mode)
@@ -80,7 +79,7 @@ class Storage(OSFCore, ContainerMixin):
         To force overwrite of an existing file, set `force=True`.
         To overwrite an existing file only if the files differ, set `update=True`
         """
-        if 'b' not in fp.mode:
+        if hasattr(fp, 'mode') and 'b' not in fp.mode:
             raise ValueError("File has to be opened in binary mode.")
 
         # all paths are assumed to be absolute
@@ -93,25 +92,29 @@ class Storage(OSFCore, ContainerMixin):
         for directory in directories:
             # skip empty directory names
             if directory:
-                parent = parent.create_folder(directory, exist_ok=True)
+                parent = await parent.create_folder(directory, exist_ok=True)
 
         url = parent._new_file_url
 
         # When uploading a large file (>a few MB) that already exists
-        # we sometimes get a ConnectionError instead of a status == 409.
+        # we sometimes get a HTTPError instead of a status == 409.
         connection_error = False
 
         # peek at the file to check if it is an empty file which needs special
         # handling in requests. If we pass a file like object to data that
         # turns out to be of length zero then no file is created on the OSF.
         # See: https://github.com/osfclient/osfclient/pull/135
-        if file_empty(fp):
-            response = self._put(url, params={'name': fname}, data=b'')
+        if await file_empty(fp):
+            logger.info("File is empty, uploading zero-length bytes.")
+            response = await self._put(url, params={'name': fname}, content=b'')
+
         else:
+            logger.info("Uploading file: %s", path)
             try:
-                response = self._put(url, params={'name': fname}, data=fp)
-            except ConnectionError:
+                response = await self._put(url, params={'name': fname}, content=fp)
+            except HTTPError:
                 connection_error = True
+                logger.info("Connection error while uploading file: %s", path)
 
         if connection_error or response.status_code == 409:
             if not force and not update:
@@ -132,19 +135,22 @@ class Storage(OSFCore, ContainerMixin):
 
             else:
                 # find the upload URL for the file we are trying to update
-                for file_ in self.files:
-                    if norm_remote_path(file_.path) == path:
-                        if not force:
-                            if checksum(path) == file_.hashes.get('md5'):
-                                # If the hashes are equal and force is False,
-                                # we're done here
-                                break
-                        # in the process of attempting to upload the file we
-                        # moved through it -> reset read position to beginning
-                        # of the file
-                        fp.seek(0)
-                        file_.update(fp)
-                        break
-                else:
+                file_ = await find_by_path(self, path)
+                if file_ is None:
                     raise RuntimeError("Could not create a new file at "
-                                       "({}) nor update it.".format(path))
+                                    "({}) nor update it.".format(path))
+                if is_folder(file_):
+                    raise RuntimeError("Cannot update a folder.")
+                if not force:
+                    if await checksum_fp(fp) == file_.hashes.get('md5'):
+                        # If the hashes are equal and force is False,
+                        # we're done here
+                        logger.info("File already exists and hashes match, "
+                                    "skipping upload. local: %s, remote: %s" %
+                                    (await checksum_fp(fp), file_.hashes.get('md5')))
+                        return
+                # in the process of attempting to upload the file we
+                # moved through it -> reset read position to beginning
+                # of the file
+                await fp.seek(0)
+                await file_.update(fp)

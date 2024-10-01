@@ -1,4 +1,6 @@
 from __future__ import print_function
+import asyncio
+import logging
 import sys
 import six
 import argparse
@@ -8,7 +10,7 @@ from .cli import clone, fetch, list_, makefolder, remove, move, upload, init
 from . import __version__
 
 
-def main():
+async def main():
     description = dedent("""
     osf is a command-line program to up and download
     files from osf.io.
@@ -29,9 +31,6 @@ def main():
     parser = argparse.ArgumentParser(
         description=description,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-u', '--username', default=None,
-                        help=('OSF username. Provide your password via '
-                              'OSF_PASSWORD environment variable'))
     parser.add_argument('--base-url', default=None,
                         help='OSF API URL (Default is https://api.osf.io/v2/)')
     parser.add_argument('--base-path', default=None,
@@ -40,6 +39,8 @@ def main():
                         help='OSF project ID')
     parser.add_argument('-v', '--version', action='version',
                         version='%(prog)s {}'.format(__version__))
+    parser.add_argument('--debug', action='store_true',
+                        help='Print debug messages')
     # dest=command stores the name of the command in a variable, this is
     # used later on to retrieve the correct sub-parser
     subparsers = parser.add_subparsers(dest='command')
@@ -129,11 +130,17 @@ def main():
 
     args = parser.parse_args()
     if 'func' in args:
+        # set up logging
+        if args.debug:
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.WARNING)
+
         # give functions a chance to influence the exit code
         # this setup is so we can print usage for the sub command
         # even if there was an error further down
         try:
-            exit_code = args.func(args)
+            exit_code = await args.func(args)
         except SystemExit as e:
             exit_code = e.code
 
@@ -148,5 +155,9 @@ def main():
         parser.print_help()
 
 
+def run_main():
+    asyncio.run(main())
+
+
 if __name__ == "__main__":
-    main()
+    run_main()

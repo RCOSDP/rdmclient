@@ -10,44 +10,41 @@ class OSF(OSFCore):
     OSF. Use the methods of this class to find projects, login
     to the OSF, etc.
     """
-    def __init__(self, username=None, password=None, token=None, base_url=None):
+    def __init__(self, token=None, base_url=None):
         super(OSF, self).__init__({})
         if base_url is not None:
             self.session.set_endpoint(base_url)
-        if username is not None and password is not None:
-            self.login(username, password)
-        elif token is not None:
+        if token is not None:
             self.login_by_token(token)
 
-    def login(self, username, password=None):
-        """Login user for protected API calls."""
-        self.session.basic_auth(username, password)
+    async def aclose(self):
+        await self.session.aclose()
 
     def login_by_token(self, token):
         """Login user for protected API calls using Access Token."""
         self.session.token_auth(token)
 
-    def project(self, project_id):
-        """Fetch project `project_id`."""
-        type_ = self.guid(project_id)
-        url = self._build_url(type_, project_id)
-        if type_ in Project._types:
-            return Project(self._json(self._get(url), 200), self.session)
-        raise OSFException('{} is unrecognized type {}. Clone supports projects and registrations'.format(project_id, type_))
+    async def project(self, project_id):
+        """Fetch project `project_id`.
 
-    def guid(self, guid):
-        """Determines JSONAPI type for provided GUID"""
-        return self._json(self._get(self._build_url('guids', guid)), 200)['data']['type']
-
-    @property
-    def username(self):
-        if self.session.auth is not None:
-            return self.session.auth[0]
-
-    @property
-    def password(self):
-        if self.session.auth is not None:
-            return self.session.auth[1]
+        GakuNin RDM assumes only node as a project (not including registrations),
+        so it does not acquire GUID information.
+        """
+        url = self._build_url('nodes', project_id, 'files')
+        return Project({
+            'data': {
+                'id': project_id,
+                'relationships': {
+                    'files': {
+                        'links': {
+                            'related': {
+                                'href': url
+                            }
+                        }
+                    }
+                }
+            }
+        }, self.session)
 
     @property
     def token(self):
@@ -60,8 +57,6 @@ class OSF(OSFCore):
 
     @property
     def has_auth(self):
-        if self.username is not None and self.password is not None:
-            return True
         if self.token is not None:
             return True
         return False

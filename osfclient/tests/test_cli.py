@@ -82,16 +82,6 @@ def test_config_project():
     assert expected in e.value.args[0]
 
 
-def test_password_prompt():
-    # No password in config should trigger the password prompt
-    # when an username is specified
-    args = MockArgs(project='test', username='theusername')
-    with patch('getpass.getpass') as getpass:
-        getpass.return_value = 'test_password'
-        osf = cli._setup_osf(args)
-        assert osf.password == 'test_password'
-
-
 @patch('osfclient.cli.config_from_file', return_value={'username': 'tu2',
                                                        'project': 'pj2'})
 def test_init(config_from_file):
@@ -110,14 +100,20 @@ def test_init(config_from_file):
 @patch('osfclient.cli.config_from_env', return_value={'username': 'tu2',
                                                       'project': 'pj2'})
 def test_might_need_auth_unauthorized(config_from_file):
-    mock_args = MockArgs(project='test', username='theusername')
+    mock_args = MockArgs(project='test')
+    def simple_getenv(key):
+        if key == 'OSF_TOKEN':
+            return 'secret'
+        return None
 
     @cli.might_need_auth
     def dummy(x):
         raise UnauthorizedException()
 
     with pytest.raises(SystemExit) as e:
-        dummy(mock_args)
+        with patch('osfclient.cli.os.getenv',
+                   side_effect=simple_getenv) as mock_getenv:
+            dummy(mock_args)
 
     assert "not authorized to access" in str(e.value)
 
@@ -137,4 +133,4 @@ def test_might_need_auth_no_username(config_from_file):
                    side_effect=simple_getenv) as mock_getenv:
             dummy(mock_args)
 
-    assert "set a username" in str(e.value)
+    assert "set a token" in str(e.value)

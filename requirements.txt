@@ -1,5 +1,6 @@
-requests
+httpx
 tqdm
 six
 python-dateutil
 tzlocal
+aiofiles>=24.1.0
