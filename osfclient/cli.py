@@ -377,7 +377,7 @@ async def remove(args):
     f = await find_by_path(store, remote_path)
     if f is None:
         sys.exit('No files found to remove.')
-    f.remove()
+    await f.remove()
 
 
 @might_need_auth
