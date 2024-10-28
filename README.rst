@@ -92,6 +92,11 @@ project ID create ``.osfcli.config``:
 after which you can simply run ``osf ls`` to list the contents of the
 project.
 
+You can also specify the following environment variables.
+
+- OSF_CLIENT_TIMEOUT - the client timeout for requests to the OSF
+
+
 Contributing
 ============
 

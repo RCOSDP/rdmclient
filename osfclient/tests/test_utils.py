@@ -1,3 +1,4 @@
+import pytest
 from mock import call, patch, Mock
 
 from osfclient.utils import file_empty
@@ -159,6 +160,7 @@ def test_makedirs_py3(mock_makedirs):
     assert expected == mock_makedirs.mock_calls
 
 
+@pytest.mark.asyncio
 async def test_empty_file():
     fake_fp = MockStream('foobar.txt', 'rb', size=1024)
     empty = await file_empty(fake_fp)
