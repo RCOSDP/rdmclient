@@ -17,6 +17,7 @@ from ..utils import is_folder
 from ..utils import checksum_fp
 from ..utils import norm_remote_path
 from ..utils import find_by_path
+from .utils import chunked_bytes_iterator
 
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,11 @@ class Storage(OSFCore, ContainerMixin):
         else:
             logger.info("Uploading file: %s", path)
             try:
-                response = await self._put(url, params={'name': fname}, content=fp)
+                response = await self._put(
+                    url,
+                    params={'name': fname},
+                    content=chunked_bytes_iterator(fp) if hasattr(fp, 'read') else fp,
+                )
             except HTTPError:
                 connection_error = True
                 logger.info("Connection error while uploading file: %s", path)
@@ -132,7 +137,6 @@ class Storage(OSFCore, ContainerMixin):
                 else:
                     # note in case of connection error, we are making an inference here
                     raise FileExistsError(path)
-
             else:
                 # find the upload URL for the file we are trying to update
                 file_ = await find_by_path(self, path)

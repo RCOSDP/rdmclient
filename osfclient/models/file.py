@@ -7,6 +7,7 @@ from typing import AsyncGenerator, Dict, Type, TypeVar
 from .core import OSFCore
 from ..exceptions import FolderExistsException, UnauthorizedException
 from ..utils import file_empty
+from .utils import chunked_bytes_iterator
 
 
 logger = logging.getLogger(__name__)
@@ -132,7 +133,10 @@ class File(OSFCore):
         # turns out to be of length zero then no file is created on the OSF
         if not await file_empty(fp):
             logger.info("Uploading file: %s", self.path)
-            response = await self._put(url, content=fp)
+            response = await self._put(
+                url,
+                content=chunked_bytes_iterator(fp) if hasattr(fp, 'read') else fp,
+            )
         else:
             logger.info("File is empty, uploading zero-length bytes.")
             response = await self._put(url, content=b'')

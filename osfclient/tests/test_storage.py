@@ -123,7 +123,9 @@ async def test_iterate_files_and_folders():
 
 
 @pytest.mark.asyncio
-async def test_create_existing_file():
+@patch('osfclient.models.storage.chunked_bytes_iterator',
+       return_value=b'TEST')
+async def test_create_existing_file(mock_chunked_bytes_iterator):
     # try to create file with a name that is already taken
     new_file_url = ('https://files.osf.io/v1/resources/9zpcy/providers/' +
                     'osfstorage/foo123/')
@@ -140,8 +142,10 @@ async def test_create_existing_file():
     with pytest.raises(exception):
         await store.create_file('foo.txt', fake_fp)
 
+    mock_chunked_bytes_iterator.assert_called_once_with(fake_fp)
+
     store._put.assert_called_once_with(new_file_url,
-                                       content=fake_fp,
+                                       content=b'TEST',
                                        params={'name': 'foo.txt'})
 
     assert fake_fp.call_count == 0
@@ -367,7 +371,9 @@ async def test_update_existing_file_fails():
 
 
 @pytest.mark.asyncio
-async def test_create_new_file():
+@patch('osfclient.models.storage.chunked_bytes_iterator',
+       return_value=b'TEST')
+async def test_create_new_file(mock_chunked_bytes_iterator):
     # create a new file at the top level
     new_file_url = ('https://files.osf.io/v1/resources/9zpcy/providers/' +
                     'osfstorage/foo123/')
@@ -379,15 +385,19 @@ async def test_create_new_file():
 
     await store.create_file('foo.txt', fake_fp)
 
+    mock_chunked_bytes_iterator.assert_called_once_with(fake_fp)
+
     store._put.assert_called_once_with(new_file_url,
-                                       content=fake_fp,
+                                       content=b'TEST',
                                        params={'name': 'foo.txt'})
 
     assert fake_fp.call_count == 0
 
 
 @pytest.mark.asyncio
-async def test_create_new_file_subdirectory():
+@patch('osfclient.models.storage.chunked_bytes_iterator',
+       return_value=b'TEST')
+async def test_create_new_file_subdirectory(mock_chunked_bytes_iterator):
     # test a new file in a new subdirectory
     new_file_url = ('https://files.osf.io/v1/resources/9zpcy/providers/' +
                     'osfstorage/bar12/')
@@ -416,8 +426,10 @@ async def test_create_new_file_subdirectory():
     with patch.object(Storage, '_put', side_effect=simple_put) as mock_put:
         await store.create_file('bar/foo.txt', fake_fp)
 
+    mock_chunked_bytes_iterator.assert_called_once_with(fake_fp)
+
     expected = [call(new_folder_url, params={'name': 'bar'}),
-                call(new_file_url, params={'name': 'foo.txt'}, content=fake_fp)]
+                call(new_file_url, params={'name': 'foo.txt'}, content=b'TEST')]
     assert mock_put.call_args_list == expected
     assert fake_fp.call_count == 0
 
@@ -445,7 +457,9 @@ async def test_create_new_zero_length_file():
 
 
 @pytest.mark.asyncio
-async def test_create_small_file_connection_error():
+@patch('osfclient.models.storage.chunked_bytes_iterator',
+       return_value=b'TEST')
+async def test_create_small_file_connection_error(mock_chunked_bytes_iterator):
     # turn a httpx.HTTPError into a RuntimeError with a more helpful
     # message that the file might exist
     new_file_url = ('https://files.osf.io/v1/resources/9zpcy/providers/' +
@@ -466,15 +480,19 @@ async def test_create_small_file_connection_error():
         with pytest.raises(exception):
             await store.create_file('foo.txt', fake_fp)
 
+    mock_chunked_bytes_iterator.assert_called_once_with(fake_fp)
+
     store._put.assert_called_once_with(new_file_url,
-                                       content=fake_fp,
+                                       content=b'TEST',
                                        params={'name': 'foo.txt'})
 
     assert fake_fp.call_count == 0
 
 
 @pytest.mark.asyncio
-async def test_create_big_file_connection_error(monkeypatch):
+@patch('osfclient.models.storage.chunked_bytes_iterator',
+       return_value=b'TEST')
+async def test_create_big_file_connection_error(mock_chunked_bytes_iterator):
     # with a "big" file, we're more confident that a connection error means the
     # file alredy exists, so raise FileExistsError without hedging
     new_file_url = ('https://files.osf.io/v1/resources/9zpcy/providers/' +
@@ -495,8 +513,10 @@ async def test_create_big_file_connection_error(monkeypatch):
         with pytest.raises(exception):
             await store.create_file('foo.txt', fake_fp)
 
+    mock_chunked_bytes_iterator.assert_called_once_with(fake_fp)
+
     store._put.assert_called_once_with(new_file_url,
-                                       content=fake_fp,
+                                       content=b'TEST',
                                        params={'name': 'foo.txt'})
 
     assert fake_fp.call_count == 0

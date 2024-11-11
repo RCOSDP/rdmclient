@@ -1,9 +1,23 @@
+import os
 import httpx
 
 from ..exceptions import UnauthorizedException
 
 
-DEFAULT_TIMEOUT = httpx.Timeout(30.0, read=None)
+def _parse_timeout(timeout, default):
+    timeout = timeout.strip()
+    if not timeout:
+        return default
+    return float(timeout)
+
+
+# rdmclient needs to support uploading large (>GB) files, so
+# the timeout period can be set using the OSF_CLIENT_TIMEOUT environment variable.
+DEFAULT_TIMEOUT = httpx.Timeout(
+    _parse_timeout(os.environ.get('OSF_CLIENT_TIMEOUT', ''), default=30.0),
+    read=None
+)
+
 
 class OSFSession(httpx.AsyncClient):
     def __init__(self, timeout=DEFAULT_TIMEOUT):
