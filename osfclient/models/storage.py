@@ -17,7 +17,7 @@ from ..utils import is_folder
 from ..utils import checksum_fp
 from ..utils import norm_remote_path
 from ..utils import find_by_path
-from .utils import chunked_bytes_iterator
+from .utils import chunked_bytes_iterator, merge_query_params
 
 
 logger = logging.getLogger(__name__)
@@ -107,14 +107,18 @@ class Storage(OSFCore, ContainerMixin):
         # See: https://github.com/osfclient/osfclient/pull/135
         if await file_empty(fp):
             logger.info("File is empty, uploading zero-length bytes.")
-            response = await self._put(url, params={'name': fname}, content=b'')
+            response = await self._put(
+                url,
+                params=merge_query_params(url, {'name': fname}),
+                content=b''
+            )
 
         else:
             logger.info("Uploading file: %s", path)
             try:
                 response = await self._put(
                     url,
-                    params={'name': fname},
+                    params=merge_query_params(url, {'name': fname}),
                     content=chunked_bytes_iterator(fp) if hasattr(fp, 'read') else fp,
                 )
             except HTTPError:

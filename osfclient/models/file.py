@@ -7,7 +7,7 @@ from typing import AsyncGenerator, Dict, Type, TypeVar
 from .core import OSFCore
 from ..exceptions import FolderExistsException, UnauthorizedException
 from ..utils import file_empty
-from .utils import chunked_bytes_iterator
+from .utils import chunked_bytes_iterator, merge_query_params
 
 
 logger = logging.getLogger(__name__)
@@ -237,7 +237,10 @@ class ContainerMixin:
     async def create_folder(self, name, exist_ok=False):
         url = self._new_folder_url
         # Create a new sub-folder
-        response = await self._put(url, params={'name': name})
+        response = await self._put(
+            url,
+            params=merge_query_params(url, {'name': name}),
+        )
         if response.status_code == 409 and not exist_ok:
             raise FolderExistsException(name)
 

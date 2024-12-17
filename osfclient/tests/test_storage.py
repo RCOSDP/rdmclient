@@ -428,7 +428,7 @@ async def test_create_new_file_subdirectory(mock_chunked_bytes_iterator):
 
     mock_chunked_bytes_iterator.assert_called_once_with(fake_fp)
 
-    expected = [call(new_folder_url, params={'name': 'bar'}),
+    expected = [call(new_folder_url, params={'kind': 'folder', 'name': 'bar'}),
                 call(new_file_url, params={'name': 'foo.txt'}, content=b'TEST')]
     assert mock_put.call_args_list == expected
     assert fake_fp.call_count == 0
