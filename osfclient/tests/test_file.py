@@ -117,7 +117,7 @@ async def test_create_existing_folder():
         await folder.create_folder('foobar')
 
     folder._put.assert_called_once_with(new_folder_url,
-                                        params={'name': 'foobar'})
+                                        params={'kind': 'folder', 'name': 'foobar'})
 
 
 @pytest.mark.asyncio
@@ -136,7 +136,7 @@ async def test_create_existing_folder_exist_ok():
     assert existing_folder.name == 'foobar'
 
     folder._put.assert_called_once_with(new_folder_url,
-                                        params={'name': 'foobar'})
+                                        params={'kind': 'folder', 'name': 'foobar'})
 
 
 @pytest.mark.asyncio
@@ -153,7 +153,7 @@ async def test_create_new_folder():
     assert isinstance(new_folder, Folder)
 
     folder._put.assert_called_once_with(new_folder_url,
-                                        params={'name': 'foobar'})
+                                        params={'kind': 'folder', 'name': 'foobar'})
 
 
 @pytest.mark.asyncio
