@@ -1,4 +1,6 @@
 import os
+from contextlib import asynccontextmanager
+
 import httpx
 
 from ..exceptions import UnauthorizedException
@@ -57,8 +59,59 @@ class OSFSession(httpx.AsyncClient):
         return response
 
     def stream(self, method, url, *args, **kwargs):
-        kwargs_ = self.modify_kwargs(kwargs)
-        return super(OSFSession, self).stream(method, url, *args, **kwargs_)
+        """Stream with safe redirect handling.
+
+        When WaterButler returns a redirect to S3 (or other external storage),
+        we must not forward Content-Type and Accept headers because they would
+        break S3's presigned URL signature validation.
+        """
+        return self._stream_with_safe_redirect(method, url, *args, **kwargs)
+
+    @asynccontextmanager
+    async def _stream_with_safe_redirect(self, method, url, *args, **kwargs):
+        """Stream with redirect handling that strips API headers.
+
+        - 301, 302, 303: Follow as GET with minimal headers
+        - 307, 308: Raise error (WB providers never use these status codes)
+        """
+        kwargs_no_redirect = kwargs.copy()
+        kwargs_no_redirect.update(dict(follow_redirects=False))
+
+        redirect_location = None
+        async with super(OSFSession, self).stream(
+            method, url, *args, **kwargs_no_redirect
+        ) as response:
+            if response.status_code in (301, 302, 303):
+                if response.headers.get('location'):
+                    redirect_location = response.headers.get('location')
+                else:
+                    yield response
+                    return
+            elif response.status_code in (307, 308):
+                raise RuntimeError(
+                    f"HTTP {response.status_code} redirect is not supported."
+                )
+            else:
+                yield response
+                return
+
+        async with self._follow_redirect(redirect_location) as redirected_response:
+            yield redirected_response
+
+    @asynccontextmanager
+    async def _follow_redirect(self, url: str):
+        """Follow a redirect with minimal headers.
+
+        Only sends headers that won't interfere with presigned URL signatures.
+        """
+        clean_headers = {
+            'User-Agent': self.headers.get('User-Agent', 'osfclient v0.0.1'),
+            'Accept-Charset': self.headers.get('Accept-Charset', 'utf-8'),
+        }
+
+        async with httpx.AsyncClient(timeout=self._timeout) as clean_client:
+            async with clean_client.stream('GET', url, headers=clean_headers) as response:
+                yield response
 
     async def get(self, url, *args, **kwargs):
         kwargs_ = self.modify_kwargs(kwargs)
