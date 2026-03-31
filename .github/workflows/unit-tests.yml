@@ -30,8 +30,6 @@ jobs:
           py.test;
           fi
       - name: Coverage
-        with:
-          job-status: ${{ job.status }}
         run: |
           if [ ${COVERAGE} == "true" ]; then
           pip install codecov;
