@@ -8,6 +8,7 @@ from mock import patch
 from osfclient import OSF
 from osfclient.cli import makefolder
 
+from osfclient.tests.mocks import MockAddon, MockAddons
 from osfclient.tests.mocks import MockArgs
 from osfclient.tests.mocks import MockProject
 
@@ -114,6 +115,7 @@ async def test_make_recursive_root_folder(OSF_project):
 
 
 @pytest.mark.asyncio
+@patch.object(OSF, 'addons', new=MockAddons([MockAddon('github')]))
 @patch.object(OSF, 'project', return_value=MockProject('1234'))
 async def test_wrong_storage_name(OSF_project):
     args = MockArgs(project='1234', target='DOESNTEXIST/a/a/a')

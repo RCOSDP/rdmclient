@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 from mock import MagicMock, PropertyMock, AsyncMock
 from ..utils import norm_remote_path
 import copy
@@ -58,7 +59,7 @@ def MockStorage(name):
         MockFolder('/a',folders=a_folders),
         MockFolder('/b',folders=b_folders),
         MockFolder('/c',folders=c_folders)]
-    mock = MagicMock(name='Storage-%s' % name,
+    mock = MagicMock(name='Storage-%s' % name, provider=name,
                      folders=AsyncIterator(folders),
                      children=AsyncIterator(folders))
     mock.create_file = MagicMock(return_value=FutureWrapper())
@@ -99,14 +100,24 @@ def MockStream(path, mode, size=1024):
 
 
 def MockProject(name):
-    mock = MagicMock(name='Project-%s' % name,
-                     storages=AsyncIterator([MockStorage('osfstorage'), MockStorage('gh')]))
+    default_store = MockStorage('osfstorage')
+    mock = MagicMock(name='Project-%s' % name, id=name,
+                     storages=AsyncIterator([default_store, MockStorage('gh')]))
     storage = MagicMock(name='Project-%s-storage' % name,
-                        return_value=FutureMockStorage('osfstorage'))
+                        return_value=FutureWrapper(default_store))
     type(mock).storage = storage
     mock._storage_mock = storage
 
     return mock
+
+
+def MockAddon(addon_id, categories=['storage']):
+    return SimpleNamespace(id=addon_id, name=addon_id, categories=categories)
+
+
+def MockAddons(addons):
+    """Stand-in for the `OSF.addons` property."""
+    return PropertyMock(return_value=AsyncIterator(addons))
 
 
 def MockArgs(output=None, project=None,

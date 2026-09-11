@@ -9,15 +9,6 @@ import six
 import aiofiles
 
 
-KNOWN_PROVIDERS = [
-    'osfstorage', 'github', 'figshare', 'googledrive',
-    'azureblobstorage', 'bitbucket', 'box', 'dataverse', 'dropbox',
-    'gitlab', 'iqbrims', 'nextcloud', 'nextcloudinstitutions',
-    'ociinstitutions', 'owncloud', 'onedrivebusiness', 's3', 's3compat',
-    's3compatb3', 's3compatinstitutions', 'swift', 'weko'
-]
-
-
 def norm_remote_path(path: str) -> str:
     """Normalize `path`.
 
@@ -30,29 +21,40 @@ def norm_remote_path(path: str) -> str:
         return path
 
 
-def split_storage(path, default='osfstorage', normalize=True):
-    """Extract storage name from file path.
+async def split_storage(path, osf, project, default='osfstorage',
+                        normalize=True):
+    """Resolve a remote path against the project's connected storages.
 
-    If a path begins with a known storage provider the name is removed
-    from the path. Otherwise the `default` storage provider is returned
-    and the path is not modified.
+    A connected provider at the start of the path selects that storage.
+    A provider the server offers but the project has not connected is an
+    error rather than a folder in the default storage. Addons in the
+    ``other`` category never hold files, so their names stay usable as
+    folder names. Otherwise the entire path belongs to the default storage.
+    Explicitly prefix with ``osfstorage/`` to access a folder named after
+    a provider.
     """
+    is_directory = path.endswith('/')
     if normalize:
         path = norm_remote_path(path)
-    env_known_providers = os.getenv('KNOWN_PROVIDERS')
-    if env_known_providers is not None:
-        known_providers = env_known_providers.split(',')
-    else:
-        known_providers = KNOWN_PROVIDERS
+    path = path.lstrip('/')
+    provider, separator, remote_path = path.partition('/')
+    has_provider = bool(separator) or is_directory
+    default_store = None
+    async for store in project.storages:
+        if has_provider and store.provider == provider:
+            return store, remote_path
+        if store.provider == default:
+            default_store = store
 
-    for provider in known_providers:
-        if path.startswith(provider + '/'):
-            if six.PY3:
-                return path.split('/', maxsplit=1)
-            else:
-                return path.split('/', 1)
-
-    return (default, path)
+    if default_store is None:
+        raise RuntimeError("Project has no storage provider '{}'".format(default))
+    if has_provider:
+        async for addon in osf.addons:
+            if addon.id == provider and 'other' not in addon.categories:
+                raise RuntimeError(
+                    "Storage provider '{}' is not connected to project '{}'"
+                    .format(provider, project.id))
+    return default_store, path
 
 
 def makedirs(path, mode=511, exist_ok=False):

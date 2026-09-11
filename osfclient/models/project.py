@@ -38,12 +38,9 @@ class Project(OSFCore):
 
     async def storage(self, provider='osfstorage'):
         """Return storage `provider`."""
-        stores = self._json(await self._get(self._storages_url), 200)
-        stores = stores['data']
-        for store in stores:
-            provides = self._get_attribute(store, 'attributes', 'provider')
-            if provides == provider:
-                return Storage(store, self.session)
+        async for store in self.storages:
+            if store.provider == provider:
+                return store
 
         raise RuntimeError("Project has no storage "
                            "provider '{}'".format(provider))
@@ -51,7 +48,9 @@ class Project(OSFCore):
     @property
     async def storages(self):
         """Iterate over all storages for this projects."""
-        stores = self._json(await self._get(self._storages_url), 200)
-        stores = stores['data']
-        for store in stores:
-            yield Storage(store, self.session)
+        url = self._storages_url
+        while url:
+            response = self._json(await self._get(url), 200)
+            for store in response['data']:
+                yield Storage(store, self.session)
+            url = response['links']['next']

@@ -1,4 +1,5 @@
 from .exceptions import OSFException
+from .models import Addon
 from .models import OSFCore
 from .models import Project
 
@@ -45,6 +46,16 @@ class OSF(OSFCore):
                 }
             }
         }, self.session)
+
+    @property
+    async def addons(self):
+        """Iterate over all addons available on the server."""
+        url = self._build_url('addons')
+        while url:
+            response = self._json(await self._get(url), 200)
+            for addon in response['data']:
+                yield Addon(addon, self.session)
+            url = response['links']['next']
 
     @property
     def token(self):

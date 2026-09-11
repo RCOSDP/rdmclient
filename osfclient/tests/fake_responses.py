@@ -53,6 +53,26 @@ def storage_node(project_id, storages=['osfstorage']):
                                'n_storages': len(used_storages)})
 
 
+# Use this to fake a response when asking for the server's addons
+# e.g. osf.addons
+def addons(ids, categories=['storage']):
+    return {
+        'data': [{
+            'id': addon_id,
+            'type': 'addon',
+            'attributes': {'name': addon_id, 'categories': categories},
+            'links': {},
+        } for addon_id in ids],
+        'links': {
+            'first': None,
+            'last': None,
+            'prev': None,
+            'next': None,
+            'meta': {'total': len(ids), 'per_page': 1000},
+        },
+    }
+
+
 def _folder(osf_id, name, storage='osfstorage'):
     template = """{
         "relationships": {
